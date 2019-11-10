@@ -4,6 +4,7 @@ use chrono::{DateTime, FixedOffset};
 
 mod datetime_helpers;
 mod io_helpers;
+mod graph_helpers;
 
 
 pub struct PriceUpdate {
@@ -13,6 +14,11 @@ pub struct PriceUpdate {
     destination_currency: String,
     forward_factor: f32,
     backward_factor: f32
+}
+
+pub struct Vertex {
+    exchange: String,
+    currency: String
 }
 
 fn main() {
@@ -38,9 +44,13 @@ fn main() {
 
     println!("{}", node.exchange);
 
+    let test_vertices = graph_helpers::vertex_factory(node);
+    println!("{}", test_vertices[0].currency);
+
     while list.len() > 0 {
         list.pop_back();
     }
 
 
 }
+
