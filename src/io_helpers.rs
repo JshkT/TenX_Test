@@ -38,7 +38,7 @@ pub fn exchange_rate_request(input: SplitWhitespace){
 
 }
 
-pub fn price_update(input: SplitWhitespace) {
+pub fn price_update(input: SplitWhitespace) -> PriceUpdate {
     println!("Incoming price update:");
     let mut price_update_array: [&str; 6] = [" "; 6];
     let mut i = 0;
@@ -50,10 +50,10 @@ pub fn price_update(input: SplitWhitespace) {
     }
     if i != 6 {
         println!("Error in input. Incorrect number of parameters.");
-        return
+        //error
     }
     let pupdate = get_node(price_update_array);
-
+    return pupdate
 
 }
 

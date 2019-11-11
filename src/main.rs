@@ -1,10 +1,11 @@
 extern crate chrono;
 
 use chrono::{DateTime, FixedOffset};
-use std::collections::HashMap;
+use std::collections::{HashMap, LinkedList};
 use std::io;
 use std::io::BufRead;
 use crate::io_helpers::is_request;
+use crate::graph_helpers::vertex_factory;
 
 mod datetime_helpers;
 mod io_helpers;
@@ -24,6 +25,16 @@ pub struct Vertex {
     exchange: String,
     currency: String
 }
+impl Vertex {
+    fn eq(self: &Self, candidate: &Vertex) -> bool {
+        if (self.exchange == candidate.exchange) && (self.currency == candidate.currency){
+            return true;
+        } else {
+            return false;
+        }
+    }
+}
+
 pub struct Edge {
     source_vertex: Vertex,
     destination_vertex: Vertex,
@@ -41,6 +52,8 @@ fn main() {
     println!("Begin");
     let stdin = io::stdin();
     let mut is_request = false;
+    let mut vertices_list: LinkedList<Vertex> = LinkedList::new();
+    let mut edges_hashmap: HashMap<(Vertex, Vertex), f32>;
 
     for line in stdin.lock().lines(){
 //        println!("stdin read: {}", line.unwrap());
@@ -48,10 +61,30 @@ fn main() {
         is_request = io_helpers::is_request(String::from(request));
 
         if io_helpers::is_request(request.to_string()) {
-            io_helpers::exchange_rate_request(request.split_whitespace())
+            io_helpers::exchange_rate_request(request.split_whitespace());
+            //get best path
         } else {
-            io_helpers::price_update(request.split_whitespace())
+            let incoming_price_update = io_helpers::price_update(request.split_whitespace());
+            //update vertices and edges
+            let new_vertices = vertex_factory(&priceUpdate);
+            for vertex in &new_vertices{
+                let mut match_found = false;
+                for j_vertex in &vertices_list{
+                    if vertex.eq(j_vertex) {
+                        match_found = true;
+                    }
+                }
+                if match_found == false {
+                    vertices_list.push_back(Vertex{exchange: vertex.exchange.clone(),
+                        currency: vertex.currency.clone()})
+                } else {
+                    //do nothing.
+                }
+            }
+//            vertices_list.append(&mut vertex_factory(&priceUpdate))
+
         }
+        println!("There are {} vertices. ", vertices_list.len());
 
 
 //        match &is_request {
@@ -77,8 +110,9 @@ fn main() {
 
     println!("{}", node.exchange);
 
-    let test_vertices = graph_helpers::vertex_factory(node);
-    println!("{}", test_vertices[0].currency);
+    let test_vertices = graph_helpers::vertex_factory(&node);
+//    println!("{}", test_vertices[0].currency);
+
 
 
     while list.len() > 0 {

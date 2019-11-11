@@ -2,7 +2,7 @@ use crate::{PriceUpdate, Vertex};
 use std::collections::{HashMap, LinkedList};
 
 
-pub fn vertex_factory(price_update: PriceUpdate) -> [Vertex;2] {
+pub fn vertex_factory(price_update: &PriceUpdate) -> LinkedList<Vertex> {
     let source_vertex = Vertex{
         exchange: price_update.exchange.clone(),
         currency: price_update.source_currency.clone()
@@ -11,7 +11,10 @@ pub fn vertex_factory(price_update: PriceUpdate) -> [Vertex;2] {
         exchange: price_update.exchange.clone(),
         currency: price_update.destination_currency.clone()
     };
-    return [source_vertex, destination_vertex];
+    let mut list: LinkedList<Vertex> = LinkedList::new();
+    list.push_back(source_vertex);
+    list.push_back(destination_vertex);
+    return list;
 }
 
 //pub fn edge_factory(input_list: LinkedList<Vertex>) -> HashMap<Vertex, Vertex> {
