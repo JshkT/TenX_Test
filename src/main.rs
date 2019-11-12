@@ -1,11 +1,15 @@
 extern crate chrono;
+extern crate petgraph;
+
 
 use chrono::{DateTime, FixedOffset};
 use std::collections::{HashMap, LinkedList};
 use std::io;
 use std::io::BufRead;
+use petgraph::Graph;
+
 use crate::io_helpers::is_request;
-use crate::graph_helpers::*;
+use crate::graph_helpers::{vertex_factory_array};
 
 mod datetime_helpers;
 mod io_helpers;
@@ -42,6 +46,8 @@ pub struct ExchangeRateRequest {
     destination_currency: String
 }
 
+
+
 fn main() {
     println!("Begin");
     let stdin = io::stdin();
@@ -49,7 +55,15 @@ fn main() {
     let mut vertices_list: LinkedList<Vertex> = LinkedList::new();
     let mut vertices_vector: Vec<Vertex> = Vec::new();
     let mut edges_hashmap: HashMap<(Vertex, Vertex), (DateTime<FixedOffset>, f32)>;
-    let mut rate_graph: graph_helpers::Graph;
+
+    let mut graph = Graph::<&str, &str>::new();
+    let mut graph2 = Graph::<Vertex, f32>::new();
+    let a = graph2.add_node(Vertex{exchange: "KRAKEN".to_string(), currency: "BTC".to_string()});
+    let b = graph2.add_node(Vertex{exchange: "KRAKEN".to_string(), currency: "USD".to_string()});
+    let c = graph2.add_node(Vertex{exchange: "GDAX".to_string(), currency: "BTC".to_string()});
+    let d = graph2.add_node(Vertex{exchange: "GDAX".to_string(), currency: "USD".to_string()});
+
+    graph2.add_edge(a, c, 1.0);
 
 
     for line in stdin.lock().lines(){
@@ -90,7 +104,7 @@ fn main() {
 
 
         }
-        println!("There are {} vertices. ", vertices_list.len());
+        println!("There are {} vertices. ", vertices_vector.len());
         let v = Vertex{exchange: "KRAKEN".to_string(), currency: "BTC".to_string()};
         println!("Vector Exists: {} ", vertices_vector.contains(&v));
 
