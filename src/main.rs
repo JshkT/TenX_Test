@@ -135,16 +135,21 @@ fn main() {
                 Some(_0) =>{println!("Found at index: {}",dest_ind.unwrap())}
             }
 
+            //check if edge between source and dest exists
             let edge_index = graph.find_edge(vertex_index3[source_ind.unwrap()], vertex_index3[dest_ind.unwrap()]);
             match edge_index {
                 None => {
+                    // If not, simply add new edge.
                     let edge_index = graph.add_edge(vertex_index3[source_ind.unwrap()], vertex_index3[dest_ind.unwrap()], edge_forward);
                 }
                 Some(_0) => {
+                    // if one exists, only update if the new rate is more recent.
                     if datetime_helpers::is_more_recent(incoming_price_update.timestamp,
                                                         graph.edge_weight(edge_index.unwrap()).unwrap().timestamp) {
                         let new_edge = Edge{ rate: incoming_price_update.forward_factor, timestamp: incoming_price_update.timestamp };
                         graph.update_edge(vertex_index3[source_ind.unwrap()], vertex_index3[dest_ind.unwrap()],new_edge);
+                    } else {
+                        // do nothing.
                     }
 
 
