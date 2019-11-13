@@ -1,18 +1,20 @@
 extern crate chrono;
 extern crate petgraph;
-
+extern crate floyd_warshall;
 
 use chrono::{DateTime, FixedOffset};
-use std::collections::{HashMap, LinkedList};
+
 use std::io;
 use std::io::BufRead;
 use petgraph::Graph;
+use petgraph::algo;
 
 use crate::io_helpers::{is_request, price_update};
 use crate::graph_helpers::{vertex_factory_array};
 use petgraph::stable_graph::EdgeIndex;
 use std::ops::Index;
 use petgraph::prelude::NodeIndex;
+use petgraph::graph::node_index;
 
 mod datetime_helpers;
 mod io_helpers;
@@ -48,24 +50,22 @@ pub struct ExchangeRateRequest {
 }
 
 
-
 fn main() {
     println!("Begin");
     let stdin = io::stdin();
     let mut is_request = false;
     let mut vertices_vector: Vec<Vertex> = Vec::new();
-    let mut edges_hashmap: HashMap<(Vertex, Vertex), (DateTime<FixedOffset>, f32)>;
 
-    let mut graph = Graph::<Vertex, Edge>::new();
+    let mut graph = Graph::<String, f32>::new();
     let mut graph2 = Graph::<Vertex, Edge>::new();
-    let mut vertex_index: Vec<Vertex> = Vec::new();
-    let mut vertex_index3: Vec<NodeIndex> = Vec::new();
-    let mut vertex_index2: Vec<Vertex> = Vec::new();
-    let mut edge_index: Vec<Edge> = Vec::new();
+    let mut graph_simple = Graph::<String, f32>::new();
+    let mut vertex_data: Vec<Vertex> = Vec::new();
+    let mut vertex_index: Vec<NodeIndex> = Vec::new();
 
+    let mut edge_index: Vec<EdgeIndex> = Vec::new();
+    let mut edge_data: Vec<Edge> = Vec::new();
 
     for line in stdin.lock().lines(){
-//        println!("stdin read: {}", line.unwrap());
         let request = &line.unwrap();
         is_request = io_helpers::is_request(String::from(request));
 
@@ -76,133 +76,180 @@ fn main() {
             let incoming_price_update = io_helpers::price_update(request.split_whitespace());
             //-------------Update vertices and edges ----------------------------
             //-------------VERTICES----------------------------------------------
-            // consider changing from linked list to array output from vertex_factory.
-            let new_vertices_array = vertex_factory_array(&incoming_price_update);
             let mut vert_vec: Vec<Vertex> = Vec::new();
 
-            for i_vertex in &new_vertices_array{
-                let mut match_found = false;
-                for j_vertex in &vertices_vector{
-                    if i_vertex.eq(j_vertex){
-                        match_found = true;
-                    }
-                }
-                if match_found == false {
-                    let v = Vertex{exchange: i_vertex.exchange.clone(), currency: i_vertex.currency.clone()};
-//                    vertices_vector.push(v);
-                    let v1 = v.clone();
-                    graph2.add_node(v);
-                    vertex_index2.push(v1);
 
-                } else {
-                    //Do nothing.
-                }
-
-            }
-            //-----------------EDGES-----------------------------------------------
+            //-----------------NODES-----------------------------------------------
             let vertex_source = Vertex{ exchange: incoming_price_update.exchange.clone(), currency: incoming_price_update.source_currency.clone()};
             let vertex_destination = Vertex { exchange: incoming_price_update.exchange.clone(), currency:incoming_price_update.destination_currency.clone() };
 
-            let edge_forward = Edge{rate: incoming_price_update.forward_factor, timestamp: incoming_price_update.timestamp};
-            let edge_backward = Edge{rate: incoming_price_update.backward_factor, timestamp: incoming_price_update.timestamp};
+            match vertex_data.contains(&vertex_source) {
+                true => {}
+                false => {
+                    let node_str = format!("{} {}", &vertex_source.exchange, &vertex_source.currency);
+                    println!("{}", &node_str);
+//                    let v = graph_simple.add_node(node_str);
+                    let v_source = graph.add_node(node_str);
+                    vertex_data.push(vertex_source.clone());
+                    vertex_index.push(v_source);
+                    println!("VINDEX BUILT IN: {}",graph.index(v_source));
 
-            match vertex_index.contains(&vertex_source) {
-                true => {}
-                false => {
-                    let v_source = graph.add_node(vertex_source.clone());
-                    vertex_index.push(vertex_source.clone());
-                    vertex_index3.push(v_source);
-                    println!("VINDEX BUILT IN: {}",graph.index(v_source).currency);
                 }
             }
-            match vertex_index.contains(&vertex_destination) {
+            match vertex_data.contains(&vertex_destination) {
                 true => {}
                 false => {
-                    let v_destination_index = graph.add_node(vertex_destination.clone());
-                    vertex_index.push(vertex_destination.clone());
-                    vertex_index3.push(v_destination_index);
+                    let node_str = format!("{} {}", &vertex_destination.exchange, &vertex_destination.currency);
+                    println!("{}", &node_str);
+//                    let v = graph_simple.add_node(node_str);
+                    let v_destination_index = graph.add_node(node_str);
+                    vertex_data.push(vertex_destination.clone());
+                    vertex_index.push(v_destination_index);
                 }
             }
-            let source_ind = vertex_index.iter().position(|x| x.eq(&vertex_source));
+
+            let source_ind = vertex_data.iter().position(|x| x.eq(&vertex_source));
             match source_ind {
                 None => { println!("NOT FOUND") },
-                Some(_0) => { println!("Found at index: {}", source_ind.unwrap()) }
+                Some(_0) => { println!("Found source at index: {}", source_ind.unwrap()) }
             }
 
-            let dest_ind = vertex_index.iter().position(|x| x.eq(&vertex_destination));
+            let dest_ind = vertex_data.iter().position(|x| x.eq(&vertex_destination));
             match dest_ind {
                 None =>{println!("NOT FOUND")},
-                Some(_0) =>{println!("Found at index: {}",dest_ind.unwrap())}
+                Some(_0) =>{println!("Found dest at index: {}",dest_ind.unwrap())}
             }
 
+            for i in &vertex_data {
+                if i.currency == vertex_destination.currency && i.exchange != vertex_destination.exchange {
+                    // if edge does not exist.
+                    println!("ADD EDGE HERE {} to {}", i.exchange, vertex_destination.exchange);
+                    // find node index
+                    let x = vertex_data.iter().position(|x| x.eq(i));
+                    let y = vertex_data.iter().position(|y| y.eq(&vertex_destination));
+                    let res = graph.find_edge(node_index(x.unwrap()),node_index(y.unwrap()));
+                    match res {
+                        None => {
+                            println!("NO EDGE WAS FOUND BETWEEN {} AND {}.", i.exchange, vertex_destination.exchange);
+                            graph.add_edge(node_index(x.unwrap()),node_index(y.unwrap()), 1.0);
+                            edge_data.push(Edge{rate: 1.0, timestamp: incoming_price_update.timestamp});
+                            graph.add_edge(node_index(y.unwrap()),node_index(x.unwrap()), 1.0);
+                            edge_data.push(Edge{rate: 1.0, timestamp: incoming_price_update.timestamp});
+
+                        },
+                        Some(_0) => println!("FOUND EDGE OF INDEX: {:?}",res.unwrap())
+                    }
+                }
+            }
+//            // may need a while loop / recursion to join to all other same currency nodes.
+//            // dest_ind represents a match between an existing vertex's currency and the destination vertex's currency.
+//            let dest_ind = vertex_data.iter().position(|x| x.currency.eq(&vertex_destination.currency));
+//            let sub_ind = vertex_data.iter().position(|y|y.eq(&vertex_destination));
+//            match dest_ind {
+//                None =>{println!("NOT FOUND")},
+//                Some(_0) =>{
+//                    // if match found, check that it isn't just to itself. we only want to build new edges between exchanges.
+//                    if vertex_data[dest_ind.unwrap()].exchange != vertex_destination.exchange {
+//                        // if match was found, check if an edge already exists between the two.
+//                        // in this case, a is the index of the found match and b is the index of the subject vertex.
+//
+////                        if graph.find_edge(vertex_index[dest_ind.unwrap()], vertex_index[x] ){
+//
+////                        }
+//                        println!("Lets add a new edge.");
+//                    }
+//                    println!("Found same currency at index: {}",dest_ind.unwrap())
+//                }
+//            }
+
+
+            // ==================EDGES==============
+
+            let source_node = vertex_index[source_ind.unwrap()];
+            let dest_node = vertex_index[dest_ind.unwrap()];
+            let edge_forward = Edge{rate: incoming_price_update.forward_factor, timestamp: incoming_price_update.timestamp};
+            let edge_backward = Edge{rate: incoming_price_update.backward_factor, timestamp: incoming_price_update.timestamp};
             //check if edge between source and dest exists
-            let edge_index = graph.find_edge(vertex_index3[source_ind.unwrap()], vertex_index3[dest_ind.unwrap()]);
-            match edge_index {
+            let edge_i = graph.find_edge(source_node, dest_node);
+
+            match edge_i {
                 None => {
                     // If not, simply add new edge.
-                    let edge_index = graph.add_edge(vertex_index3[source_ind.unwrap()], vertex_index3[dest_ind.unwrap()], edge_forward);
+                    let e = graph.add_edge(source_node,
+                                           dest_node, edge_forward.rate);
+
+                    edge_index.push(e);
+                    edge_data.push(edge_forward);
+
                 }
                 Some(_0) => {
                     // if one exists, only update if the new rate is more recent.
+                    println!("EDGES 184: {}", graph.edge_count());
+                    println!("EDGE INDEX AT 184: {:?}", edge_i.unwrap());
                     if datetime_helpers::is_more_recent(incoming_price_update.timestamp,
-                                                        graph.edge_weight(edge_index.unwrap()).unwrap().timestamp) {
+                                                        edge_data[edge_i.unwrap().index()].timestamp ){
                         let new_edge = Edge{ rate: incoming_price_update.forward_factor, timestamp: incoming_price_update.timestamp };
-                        graph.update_edge(vertex_index3[source_ind.unwrap()], vertex_index3[dest_ind.unwrap()],new_edge);
+                        graph.update_edge(vertex_index[source_ind.unwrap()], vertex_index[dest_ind.unwrap()], new_edge.rate);
+                        edge_data[edge_i.unwrap().index()] = new_edge;
+
                     } else {
                         // do nothing.
                     }
 
+                }
+            }
+
+            // Check reverse direction.
+            let edge_i = graph.find_edge(dest_node, source_node);
+            match edge_i {
+                None => {
+                    // If not, simply add new edge.
+                    let e = graph.add_edge(dest_node,
+                                           source_node, edge_backward.rate);
+
+                    edge_index.push(e);
+                    edge_data.push(edge_backward);
+
+                }
+                Some(_0) => {
+                    // if one exists, only update if the new rate is more recent.
+                    if datetime_helpers::is_more_recent(incoming_price_update.timestamp,
+                                                        edge_data[edge_i.unwrap().index()].timestamp ){
+                        let new_edge = Edge{ rate: incoming_price_update.backward_factor, timestamp: incoming_price_update.timestamp };
+                        graph.update_edge(vertex_index[dest_ind.unwrap()], vertex_index[source_ind.unwrap()], new_edge.rate);
+                        edge_data[edge_i.unwrap().index()] = new_edge;
+
+                    } else {
+                        // do nothing.
+                    }
 
                 }
             }
 
-//            graph.contains_edge(, )
 
-//            graph.index()
-//            let res1 = edge_index.iter().position(|x| )
-//            graph2.extend_with_edges(&[]);
+
+
+            println!("EDGES: {}", graph.edge_count());
+            let path = algo::astar(
+                &graph,
+                vertex_index[0],
+                |n| n==vertex_index[vertex_index.len()-1],
+                |e| *e.weight(),
+                |_| (0.0),
+            );
+            match path.clone(){
+                Some((cost, path)) => {
+                    println!("COST: {}, PATH: {:?}", cost, path);
+                }
+                None => println!("NO PATH")
+            }
+
+
 
         }
 
 
-        println!("There are {} vertices. ", vertices_vector.len());
-        let v = Vertex{exchange: "KRAKEN".to_string(), currency: "BTC".to_string()};
-        println!("Vector Exists: {} ", vertices_vector.contains(&v));
-
-        println!("There are {} vertices in graph. ", graph2.node_count());
-        let v = Vertex{exchange: "KRAKEN".to_string(), currency: "BTC".to_string()};
-        println!("Vector2 Exists: {} ", vertex_index2.contains(&v));
-        println!("22222 {}", vertex_index2[0].currency.to_string());
-
-        //Code to find index of some vertex.
-        let res1 = vertex_index.iter().position(|x| x.eq(&v));
-        match res1 {
-            None =>{println!("NOT FOUND")},
-            Some(_0) =>{println!("Found at index: {}",res1.unwrap())}
-        }
-        println!("{:?}", res1);
-//        match &is_request {
-//            true => io_helpers::exchange_rate_request(request.split_whitespace()),
-//            false => io_helpers::price_update(request.split_whitespace()),
-//        }
     }
-
-
-    let input_path = "input.txt";
-    let contents = io_helpers::get_contents_from_txt(input_path);
-
-//    println!("File Contents:\n\n{}", contents);
-
-    let mut list = io_helpers::contents_processor(&contents);
-
-
-    println!("list len: {}", list.len());
-    let test_array = list.pop_back().unwrap();
-    println!("{}", test_array[0]);
-
-    let node: PriceUpdate = io_helpers::get_node(test_array);
-
-    println!("{}", node.exchange);
 
 }
 
