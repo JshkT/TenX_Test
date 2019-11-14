@@ -19,7 +19,8 @@ https://doc.rust-lang.org/1.30.0/book/second-edition/ch01-01-installation.html
 After that, enter the following commands in Terminal to run the program.
 ```sh
 $ cd TenX_Test
-$ cargo run --package TenX_Test --bin TenX_Test
+$ cargo build
+$ cargo run
 ```
 
 Price Updates should be of the form:
