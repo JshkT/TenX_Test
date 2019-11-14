@@ -7,7 +7,12 @@ The task was to take price updates and exchange rate requests as inputs and retu
 I chose to implement my solution using Rust.
 
 ## Usage
-Enter the following commands in Terminal to run the program.
+
+You will need Rust installed to run this. You can find instructions for that at this link.
+
+https://doc.rust-lang.org/1.30.0/book/second-edition/ch01-01-installation.html
+
+After that, enter the following commands in Terminal to run the program.
 ```sh
 $ cd TenX_Test
 $ cargo run --package TenX_Test --bin TenX_Test
