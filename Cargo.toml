@@ -9,3 +9,6 @@ edition = "2018"
 [dependencies]
 chrono = "0.4"
 petgraph = "0.4.13"
+matrix = "0.22.0"
+rust_decimal = "1.0.3"
+rust_decimal_macros = "1.0.3"

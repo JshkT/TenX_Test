@@ -1,91 +1,34 @@
-use crate::{PriceUpdate, Vertex, Edge};
-use std::collections::{HashMap, LinkedList};
+use crate::{Vertex};
+use petgraph::prelude::NodeIndex;
+use matrix::prelude::Compressed;
 
-pub struct Graph {
-    vertices: Vec<VertexData>,
-    edges: Vec<EdgeData>
-}
-
-pub struct Successors<'graph> {
-    graph: &'graph Graph,
-    current_edge_index: Option<EdgeIndex>
-}
-
-impl<'graph> Iterator for Successors<'graph> {
-    type Item = VertexIndex;
-
-    fn next(&mut self) -> Option<VertexIndex> {
-            match self.current_edge_index {
-                None => None,
-                Some(edge_num) => {
-                    let edge = &self.graph.edges[edge_num];
-                    self.current_edge_index = edge.next_outgoing_edge;
-                    Some(edge.target)
-            }
+pub fn get_index_from_vertex(v: &Vertex, vertex_data: &Vec<Vertex>, vertex_index: &Vec<NodeIndex>) -> Option<NodeIndex> {
+    let ind = vertex_data.iter().position(|x| x.eq(v));
+    match ind {
+        None => {
+            println!("Get index from vertex not found.");
+            return None
+        },
+        Some(_0) => {
+            println!("Get index found: {}", ind.unwrap());
+            return Option::from(vertex_index[ind.unwrap()]);
         }
     }
 }
 
-impl Graph {
-    pub fn add_node(&mut self) -> VertexIndex {
-        let index = self.vertices.len();
-        self.vertices.push(VertexData {first_outgoing_edge: None});
-        index
+pub fn get_path(u: usize, v: usize, next: Compressed<usize>) -> Vec<usize> {
+//    println!("get_path received {} and {}", u, v);
+    let mut path: Vec<usize> = Vec::new();
+    path.push(u);
+//    println!("{:?}", path.get(u));
+    let mut u = u;
+    while u != v {
+//        println!("{}, {}", u, v);
+        u = next.get((u,v));
+        path.push(u);
     }
+//    println!("{}, {}", u, v);
+//    println!("LEN: {}", path.len());
+    return path
 
-    pub fn add_edge(&mut self, source: VertexIndex, target: VertexIndex) {
-        let edge_index = self.edges.len();
-        let vertex_data = &mut self.vertices[source];
-        self.edges.push(EdgeData{
-            target: target,
-            next_outgoing_edge: vertex_data.first_outgoing_edge
-        });
-        vertex_data.first_outgoing_edge = Option::from(edge_index);
-    }
-
-    pub fn successors(&self, source: VertexIndex) -> Successors {
-        let first_outgoing_edge = self.vertices[source].first_outgoing_edge;
-        Successors { graph: self, current_edge_index: first_outgoing_edge }
-    }
 }
-
-
-pub type VertexIndex = usize;
-
-pub struct VertexData {
-    first_outgoing_edge: Option<EdgeIndex>
-}
-
-pub type EdgeIndex = usize;
-
-pub struct EdgeData {
-    target: VertexIndex,
-    next_outgoing_edge: Option<EdgeIndex>
-}
-
-
-pub fn vertex_factory_array(price_update: &PriceUpdate) -> [Vertex; 2] {
-    let source_vertex = Vertex{
-        exchange: price_update.exchange.clone(),
-        currency: price_update.source_currency.clone()
-    };
-    let destination_vertex = Vertex {
-        exchange: price_update.exchange.clone(),
-        currency: price_update.destination_currency.clone()
-    };
-
-    return [source_vertex, destination_vertex];
-}
-
-//pub fn edge_factory(input_list: LinkedList<Vertex>) -> HashMap<Vertex, Vertex> {
-//    let edges: HashMap<Vertex, Vertex>;
-//    let input_list_copy = inputlist.clone();
-//    while input_list.len() > 0 {
-//        let abc: Vertex = input_list_copy.pop_back();
-//        edges.insert()
-//    }
-//    return edges;
-//
-//}
-//
-//pub fn
