@@ -2,14 +2,14 @@ use std::fs::File;
 use std::io::prelude::*;
 
 use std::collections::LinkedList;
-use crate::{datetime_helpers, PriceUpdate, ExchangeRateRequest};
+use crate::{datetime_helpers, PriceUpdate, ExchangeRateRequest, DEBUG};
 use std::str::SplitWhitespace;
 
 pub fn is_request(line_input: String) -> bool {
-    println!("Starting process_line on: {}", line_input);
+//    println!("Starting process_line on: {}", line_input);
 
     if line_input.contains("EXCHANGE_RATE_REQUEST"){
-        println!("EXCHANGE_RATE_REQUEST");
+//        println!("EXCHANGE_RATE_REQUEST");
 //        exchange_rate_request(line_input.split_whitespace());
         return true;
     } else {
@@ -19,11 +19,10 @@ pub fn is_request(line_input: String) -> bool {
 }
 
 pub fn exchange_rate_request(input: SplitWhitespace) -> ExchangeRateRequest{
-    println!("GET EXCHANGE RATE FOR REQUEST:");
+//    println!("GET EXCHANGE RATE FOR REQUEST:");
     let mut request_array: [&str; 5] = [" "; 5];
     let mut i=0;
     for elem in input {
-        println!("ELEM: {}", elem.to_string());
         request_array[i] = elem;
         i+=1;
     }
@@ -37,12 +36,11 @@ pub fn exchange_rate_request(input: SplitWhitespace) -> ExchangeRateRequest{
 }
 
 pub fn price_update(input: SplitWhitespace) -> PriceUpdate {
-    println!("Incoming price update:");
+//    println!("Incoming price update:");
     let mut price_update_array: [&str; 6] = [" "; 6];
     let mut i = 0;
 
     for elem in input {
-        println!("ELEM: {}", elem.to_string());
         price_update_array[i] = elem;
         i+=1;
     }
@@ -82,12 +80,14 @@ pub fn contents_processor(input_contents: &str) -> LinkedList<[&str; 6]> {
                         destination_exchange: request_array[2].to_string(),
                         destination_currency: request_array[3].to_string()
                     };
-                    println!("ExchangeRateRequest: {}, {}, {}, {}",
-                             request.source_exchange,
-                             request.source_currency,
-                             request.destination_exchange,
-                             request.destination_currency
-                    );
+                    if DEBUG {
+                        println!("ExchangeRateRequest: {}, {}, {}, {}",
+                                 request.source_exchange,
+                                 request.source_currency,
+                                 request.destination_exchange,
+                                 request.destination_currency
+                        );
+                    }
 
                     return list;
                 }
