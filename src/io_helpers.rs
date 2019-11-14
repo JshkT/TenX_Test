@@ -1,3 +1,8 @@
+/* Written by Joshua Tan in 2019
+* For TenX Technical Exercise
+* (The Exchange Rate Path Problem)
+*/
+
 use std::fs::File;
 use std::io::prelude::*;
 

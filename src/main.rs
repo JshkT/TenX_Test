@@ -1,21 +1,22 @@
+/* Written by Joshua Tan in 2019
+* For TenX Technical Exercise
+* (The Exchange Rate Path Problem)
+*/
+
 extern crate rust_decimal;
 extern crate chrono;
 extern crate petgraph;
 extern crate matrix;
 
-
+use crate::graph_helpers::{get_index_from_vertex, get_path, vertex_string_format};
 use chrono::{DateTime, FixedOffset};
-
 use std::io;
 use std::io::{BufRead};
 use petgraph::Graph;
-use matrix::prelude::*;
-
-use crate::graph_helpers::{get_index_from_vertex, get_path, vertex_string_format};
 use petgraph::stable_graph::EdgeIndex;
 use petgraph::prelude::NodeIndex;
 use petgraph::graph::node_index;
-use matrix::prelude::{Compressed};
+use matrix::prelude::*;
 use matrix::format::compressed::Variant;
 use rust_decimal::Decimal;
 use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
@@ -23,7 +24,6 @@ use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
 mod datetime_helpers;
 mod io_helpers;
 mod graph_helpers;
-
 
 pub struct PriceUpdate {
     timestamp: DateTime<FixedOffset>,
@@ -58,7 +58,7 @@ const DEBUG: bool = false;
 
 
 fn main() {
-    println!("Begin");
+    println!("Please enter either a Price Update or an Exchange Rate Request: ");
 
     let stdin = io::stdin();
 
@@ -77,7 +77,7 @@ fn main() {
             REQUEST_PARAMETERS | UPDATE_PARAMETERS => {
 
                 // Check if incoming line is a Request or a Price Update
-                let is_request = io_helpers::is_request(String::from(input_string));
+                let is_request = io_helpers::is_request(input_string.to_string());
                 if !is_request {
 
                     // Input was found to be a Price Update not a Exchange Rate Request.
@@ -113,8 +113,6 @@ fn main() {
                             vertex_index.push(v_destination_index);
                         }
                     }
-
-
 
                     // ============ Time to add edges =====================
                     /* The following handles edge creation between vertexes that share

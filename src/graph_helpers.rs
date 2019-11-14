@@ -1,3 +1,8 @@
+/* Written by Joshua Tan in 2019
+* For TenX Technical Exercise
+* (The Exchange Rate Path Problem)
+*/
+
 use crate::{Vertex, DEBUG};
 use petgraph::prelude::NodeIndex;
 use matrix::prelude::Compressed;
