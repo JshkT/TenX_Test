@@ -1,4 +1,3 @@
-#[macro_use]
 extern crate rust_decimal;
 extern crate chrono;
 extern crate petgraph;
@@ -10,26 +9,20 @@ use chrono::{DateTime, FixedOffset};
 use std::io;
 use std::io::{BufRead, Write};
 use petgraph::Graph;
-use petgraph::algo;
 use matrix::prelude::*;
-#[macro_use]
-use rust_decimal_macros::*;
-use rust_decimal::prelude;
 
 
 
 
 use crate::graph_helpers::{get_index_from_vertex, get_path};
 use petgraph::stable_graph::EdgeIndex;
-use std::ops::{Index, Mul};
+use std::ops::Index;
 use petgraph::prelude::NodeIndex;
 use petgraph::graph::node_index;
 use matrix::prelude::{Compressed};
 use matrix::format::compressed::Variant;
 use rust_decimal::Decimal;
-use std::str::FromStr;
 use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
-use crate::io_helpers::exchange_rate_request;
 
 mod datetime_helpers;
 mod io_helpers;
@@ -69,7 +62,6 @@ fn main() {
     println!("Begin");
 
     let stdin = io::stdin();
-    let vertices_vector: Vec<Vertex> = Vec::new();
 
     let mut graph = Graph::<String, f32>::new();
     let mut vertex_data: Vec<Vertex> = Vec::new();
@@ -77,8 +69,6 @@ fn main() {
 
     let mut edge_index: Vec<EdgeIndex> = Vec::new();
     let mut edge_data: Vec<Edge> = Vec::new();
-
-    let mut next: Compressed<usize> = Compressed::new((graph.node_count(), graph.node_count()), Variant::Column);
 
     for line in stdin.lock().lines(){
         let request = &line.unwrap();
@@ -364,7 +354,7 @@ fn main() {
 
                     let u = source_index.unwrap().index();
                     let v = dest_index.unwrap().index();
-                    
+
 
                     let best_rate = rate.get((u, v));
                     println!("BEST_RATES_BEGIN <{}> <{}> <{}> <{}> <{}> ",

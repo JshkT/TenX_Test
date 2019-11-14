@@ -1,6 +1,4 @@
-use crate::{PriceUpdate, Vertex, Edge};
-use std::collections::{HashMap, LinkedList};
-use petgraph::Graph;
+use crate::{Vertex};
 use petgraph::prelude::NodeIndex;
 use matrix::prelude::Compressed;
 
@@ -16,9 +14,6 @@ pub fn get_index_from_vertex(v: &Vertex, vertex_data: &Vec<Vertex>, vertex_index
             return Option::from(vertex_index[ind.unwrap()]);
         }
     }
-
-    return None;
-
 }
 
 pub fn get_path(u: usize, v: usize, next: Compressed<usize>) -> Vec<usize> {
