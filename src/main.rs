@@ -7,7 +7,7 @@ extern crate matrix;
 use chrono::{DateTime, FixedOffset};
 
 use std::io;
-use std::io::{BufRead, Write};
+use std::io::{BufRead};
 use petgraph::Graph;
 use matrix::prelude::*;
 
@@ -73,17 +73,17 @@ fn main() {
         let input_string = &line.unwrap();
         let x = input_string.split_whitespace();
         match x.count() {
+            // Proceed only if the input matches the number of expected parameters.
             REQUEST_PARAMETERS | UPDATE_PARAMETERS => {
-                // Proceed only if the input matches the number of expected parameters.
-//                println!("OK NUMBER OF PARAMETERS");
-                let is_request = io_helpers::is_request(String::from(input_string));
 
                 // Check if incoming line is a Request or a Price Update
+                let is_request = io_helpers::is_request(String::from(input_string));
                 if !is_request {
-                    let incoming_price_update = io_helpers::price_update(input_string.split_whitespace());
-                    //-------------Update vertices and edges ----------------------------
-                    //-------------VERTICES----------------------------------------------
 
+                    // Input was found to be a Price Update not a Exchange Rate Request.
+                    let incoming_price_update = io_helpers::price_update(input_string.split_whitespace());
+
+                    //=============== Adding Vertices =======================================
                     let vertex_source = Vertex {
                         exchange: incoming_price_update.exchange.clone(),
                         currency: incoming_price_update.source_currency.clone()
@@ -116,7 +116,10 @@ fn main() {
 
 
 
-                    // Edge adding.
+                    // ============ Time to add edges =====================
+                    /* The following handles edge creation between vertexes that share
+                     * the same currency but different exchanges.
+                     */
                     for i in &vertex_data {
                         if i.currency == vertex_destination.currency {
                             // if edge does not exist.
@@ -152,7 +155,7 @@ fn main() {
                             }
                         }
                     }
-
+                    // Second half of checks and adding.
                     for i in &vertex_data {
                         if i.currency == vertex_source.currency {
                             // if edge does not exist.
@@ -205,16 +208,18 @@ fn main() {
                         }
                     }
 
-                    // ==================EDGES==============
-
+                    /* The following adds edges as specified in the incoming price update.
+                    * It only adds edges if they are either found not to exist or if the
+                    * incoming price update is more recent than the existing rate.
+                    */
                     let source_node = get_index_from_vertex(&vertex_source, &vertex_data, &vertex_index).unwrap();
-//            let source_node = vertex_index[source_ind.unwrap()];
-                    let dest_node = vertex_index[dest_ind.unwrap()];
+                    let dest_node = get_index_from_vertex(&vertex_destination, &vertex_data, &vertex_index).unwrap();
+
                     let edge_forward = Edge { rate: incoming_price_update.forward_factor, timestamp: incoming_price_update.timestamp };
                     let edge_backward = Edge { rate: incoming_price_update.backward_factor, timestamp: incoming_price_update.timestamp };
+
                     //check if edge between source and dest exists
                     let edge_i = graph.find_edge(source_node, dest_node);
-
                     match edge_i {
                         None => {
                             // If not, simply add new edge.
@@ -261,16 +266,16 @@ fn main() {
                         }
                     }
                 } else {
-                    //------------Get best path after building graph---------------------------------
-                    let rate_request = io_helpers::exchange_rate_request(input_string.split_whitespace());
-                    if vertex_data.contains(&Vertex { exchange: rate_request.source_exchange, currency: rate_request.source_currency }) &&
-                        vertex_data.contains(&Vertex { exchange: rate_request.destination_exchange, currency: rate_request.destination_currency }) {}
+                    /* Nothing new to add
+                    *  Proceed to build graph and get best path.
+                    */
                 }
 
                 if DEBUG {
                     println!("EDGES: {}", graph.edge_count());
                 }
 
+                // Best rate lookup table initialisation. As detailed in the challenge brief.
                 if graph.node_count() > 0 {
                     let mut rate: Compressed<f32> = Compressed::zero((graph.node_count(), graph.node_count()));
                     //Builds Rate lookup table.
@@ -280,17 +285,13 @@ fn main() {
                             match x {
                                 None => {
                                     rate.set((i.index(), j.index()), 0.0);
-//                                    print!("[{},{}] ", i.index(), j.index());
                                 },
                                 Some(_0) => {
                                     let y = graph.edge_weight(x.unwrap());
-//                                    print!("{:?} ", y);
                                     rate.set((i.index(), j.index()), *y.unwrap());
                                 }
                             }
                         }
-//                        print!("\n");
-//                        io::stdout().flush().unwrap();
                     }
 
                     // Prints out the initial "rate" lookup table.
@@ -327,10 +328,6 @@ fn main() {
                                 let a = Decimal::from_f32(rate.get((i, k))).unwrap();
                                 let b = Decimal::from_f32(rate.get((k, j))).unwrap();
                                 let res = a.checked_mul(b).unwrap();
-
-//                                println!("u: {}", u);
-//                                println!("{} * {} = {}", a, b, res);
-
                                 if u < res {
                                     rate.set((i, j), Decimal::to_f32(&res).unwrap());
                                     next.set((i, j), next.get((i, k)));
@@ -339,9 +336,8 @@ fn main() {
                         }
                     }
                     // Turn debug on to see the lookup tables.
-                    match DEBUG {
-                        true => {
-                            println!("=========UPDATED NEXTS===========");
+                    if DEBUG {
+                            println!("========= UPDATED NEXTS ===========");
                             for
                                 i in
                                 0..next.
@@ -351,8 +347,7 @@ fn main() {
                                 }
                                 print!("\n");
                             }
-                            println!("======Updated Rates=============");
-
+                            println!("========= UPDATED RATES ===========");
                             for
                                 i in
                                 0..rate.
@@ -362,13 +357,10 @@ fn main() {
                                 }
                                 print!("\n");
                             }
-                        },
-                        false => {}
                     }
+
                     if is_request {
                         let rate_request = io_helpers::exchange_rate_request(input_string.split_whitespace());
-
-
                         let source_vertex = Vertex { exchange: rate_request.source_exchange, currency: rate_request.source_currency };
                         let dest_vertex = Vertex { exchange: rate_request.destination_exchange, currency: rate_request.destination_currency };
 
