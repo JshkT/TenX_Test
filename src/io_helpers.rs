@@ -4,8 +4,6 @@ use std::io::prelude::*;
 use std::collections::LinkedList;
 use crate::{datetime_helpers, PriceUpdate, ExchangeRateRequest};
 use std::str::SplitWhitespace;
-use std::borrow::Borrow;
-use std::ops::Deref;
 
 pub fn is_request(line_input: String) -> bool {
     println!("Starting process_line on: {}", line_input);
@@ -20,7 +18,7 @@ pub fn is_request(line_input: String) -> bool {
     }
 }
 
-pub fn exchange_rate_request(input: SplitWhitespace){
+pub fn exchange_rate_request(input: SplitWhitespace) -> ExchangeRateRequest{
     println!("GET EXCHANGE RATE FOR REQUEST:");
     let mut request_array: [&str; 5] = [" "; 5];
     let mut i=0;
@@ -35,7 +33,7 @@ pub fn exchange_rate_request(input: SplitWhitespace){
         destination_exchange: request_array[3].to_string(),
         destination_currency: request_array[4].to_string()
     };
-
+    return request
 }
 
 pub fn price_update(input: SplitWhitespace) -> PriceUpdate {
@@ -75,7 +73,6 @@ pub fn contents_processor(input_contents: &str) -> LinkedList<[&str; 6]> {
         for elem in cont_elem {
 //            println!("{}", elem);
             if is_request == true {
-                println!("26: {}", elem.to_string());
                 request_array[j] = elem;
                 j+=1;
                 if j >= 4 {

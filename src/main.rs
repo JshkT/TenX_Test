@@ -1,7 +1,5 @@
 extern crate chrono;
 extern crate petgraph;
-extern crate floyd_warshall;
-#[macro_use]
 extern crate matrix;
 
 use chrono::{DateTime, FixedOffset};
@@ -12,13 +10,13 @@ use petgraph::Graph;
 use petgraph::algo;
 use matrix::prelude::*;
 
-use crate::io_helpers::{is_request, price_update};
-use crate::graph_helpers::{vertex_factory_array, get_index_from_vertex};
+
+use crate::graph_helpers::{get_index_from_vertex};
 use petgraph::stable_graph::EdgeIndex;
 use std::ops::Index;
 use petgraph::prelude::NodeIndex;
 use petgraph::graph::node_index;
-use matrix::prelude::{Compressed, Conventional};
+use matrix::prelude::{Compressed};
 use matrix::format::compressed::Variant;
 
 mod datetime_helpers;
@@ -60,7 +58,7 @@ fn main() {
 
     let stdin = io::stdin();
     let mut is_request = false;
-    let mut vertices_vector: Vec<Vertex> = Vec::new();
+    let vertices_vector: Vec<Vertex> = Vec::new();
 
     let mut graph = Graph::<String, f32>::new();
     let mut vertex_data: Vec<Vertex> = Vec::new();
@@ -69,18 +67,20 @@ fn main() {
     let mut edge_index: Vec<EdgeIndex> = Vec::new();
     let mut edge_data: Vec<Edge> = Vec::new();
 
+    let mut next: Compressed<usize> = Compressed::new((graph.node_count(), graph.node_count()), Variant::Column);
+
     for line in stdin.lock().lines(){
         let request = &line.unwrap();
-        is_request = io_helpers::is_request(String::from(request));
+        let is_request = io_helpers::is_request(String::from(request));
 
-        if io_helpers::is_request(request.to_string()) {
-            io_helpers::exchange_rate_request(request.split_whitespace());
+        if is_request {
+            let rate_request = io_helpers::exchange_rate_request(request.split_whitespace());
             //------------Get best path-----------------------------------------
+
         } else {
             let incoming_price_update = io_helpers::price_update(request.split_whitespace());
             //-------------Update vertices and edges ----------------------------
             //-------------VERTICES----------------------------------------------
-            let mut vert_vec: Vec<Vertex> = Vec::new();
 
 
             //-----------------NODES-----------------------------------------------
@@ -250,31 +250,24 @@ fn main() {
                 }
             }
 
-
-
-
-            println!("EDGES: {}", graph.edge_count());
-            let path = algo::astar(
-                &graph,
-                vertex_index[0],
-                |n| n==vertex_index[vertex_index.len()-1],
-                |e| *e.weight(),
-                |_| (0.0),
-            );
-            match path.clone(){
-                Some((cost, path)) => {
-                    println!("COST: {}, PATH: {:?}", cost, path);
-                }
-                None => println!("NO PATH")
+    }
+        println!("EDGES: {}", graph.edge_count());
+        let path = algo::astar(
+            &graph,
+            vertex_index[0],
+            |n| n==vertex_index[vertex_index.len()-1],
+            |e| *e.weight(),
+            |_| (0.0),
+        );
+        match path.clone(){
+            Some((cost, path)) => {
+                println!("COST: {}, PATH: {:?}", cost, path);
             }
-
-
-
+            None => println!("NO PATH")
         }
+
+
         let mut rate: Compressed<f32> = Compressed::zero((graph.node_count(), graph.node_count()));
-//        let mut rate: Conventional<f32> = Conventional::zero((graph.node_count(), graph.node_count()));
-
-
         //Builds Rate lookup table.
         for i in &vertex_index {
             for j in &vertex_index {
@@ -282,7 +275,7 @@ fn main() {
                 match x {
                     None => {print!("[{},{}] ", i.index(),j.index());
                         rate.set((i.index(),j.index()), 0.0);
-                     },
+                    },
                     Some(_0) => {let y = graph.edge_weight(x.unwrap());
                         print!("{:?} ", y);
                         rate.set((i.index(), j.index()), *y.unwrap());
@@ -293,12 +286,93 @@ fn main() {
             io::stdout().flush().unwrap();
 
         }
+        for i in 0..rate.rows {
+            for j in 0..rate.columns {
+                print!("{} ", rate.get((i, j)));
+            }
+            print!("\n");
+        }
 
-//        rate.set((0, 0), 42.0);
-//        let mut rate = Compressed::zero((graph.node_count(), graph.node_count()));
-//        let dense = Conventional::from(&sparse);
+        println!("{:?}", rate.get((0,0)));
+        let mut next: Compressed<usize> = Compressed::new((graph.node_count(), graph.node_count()), Variant::Column);
+        for i in &vertex_index {
+            for j in &vertex_index {
+                next.set((i.index(),j.index()), j.index());
+            }
+        }
 
+        for i in 0..next.rows {
+            for j in 0..next.columns {
+                print!("{} ", next.get((i, j)));
+            }
+            print!("\n");
+        }
+
+        //FLOYD-WARSHALL
+        for k in 0..graph.node_count(){
+            for i in 0..graph.node_count(){
+                for j in 0..graph.node_count(){
+                    if rate.get((i,j)) < rate.get((i,k)) * rate.get((k,j)) {
+                        rate.set((i,j), rate.get((i,k)) * rate.get((k,j)));
+                        next.set((i,j), next.get((i,k)));
+                    }
+                }
+            }
+        }
+        //
+        println!("=========UPDATED NEXTS===========");
+        for i in 0..next.rows {
+            for j in 0..next.columns {
+                print!("{} ", next.get((i, j)));
+            }
+            print!("\n");
+        }
+
+        if is_request {
+            let rate_request = io_helpers::exchange_rate_request(request.split_whitespace());
+
+            let source_vertex = Vertex{exchange: rate_request.source_exchange, currency: rate_request.source_currency};
+            let dest_vertex = Vertex{exchange: rate_request.destination_exchange, currency: rate_request.destination_currency};
+            let source_index = get_index_from_vertex(&source_vertex, &vertex_data, &vertex_index);
+            let dest_index = get_index_from_vertex(&dest_vertex, &vertex_data, &vertex_index);
+
+            let u = source_index.unwrap().index();
+            let v = dest_index.unwrap().index();
+
+            let best_rate = rate.get((u,v));
+            println!("BEST_RATES_BEGIN <{}> <{}> <{}> <{}> <{}> ",
+                     &source_vertex.exchange, &source_vertex.currency,
+                     &dest_vertex.exchange, &dest_vertex.currency, best_rate);
+
+            let path = get_path(u, v, next);
+            for x in &path{
+//                println!("{:?}",x);
+                let exchange = &vertex_data.get(*x).unwrap().exchange;
+                let currency = &vertex_data.get(*x).unwrap().currency;
+                println!("<{}, {}>", exchange, currency);
+            }
+            println!("BEST_RATES_END");
+
+        }
 
     }
+
+}
+
+pub fn get_path(u: usize, v: usize, next: Compressed<usize>) -> Vec<usize> {
+//    println!("get_path received {} and {}", u, v);
+    let mut path: Vec<usize> = Vec::new();
+    path.push(u);
+//    println!("{:?}", path.get(u));
+    let mut u = u;
+    while u != v {
+//        println!("{}, {}", u, v);
+        u = next.get((u,v));
+        path.push(u);
+    }
+//    println!("{}, {}", u, v);
+//    println!("LEN: {}", path.len());
+    return path
+
 }
 
