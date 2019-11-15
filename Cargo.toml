@@ -1,5 +1,5 @@
 [package]
-name = "TenX"
+name = "TenX_Test"
 version = "0.1.0"
 authors = ["Joshua Tan <joshktan@gmail.com>"]
 edition = "2018"
