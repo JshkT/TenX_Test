@@ -54,6 +54,7 @@ pub struct ExchangeRateRequest {
 }
 const REQUEST_PARAMETERS: usize = 5;
 const UPDATE_PARAMETERS: usize = 6;
+const REQUEST_HEADER: &str = "EXCHANGE_RATE_REQUEST";
 const DEBUG: bool = false;
 
 fn main() {
@@ -69,13 +70,16 @@ fn main() {
     let mut edge_data: Vec<Edge> = Vec::new();
 
     for line in stdin.lock().lines() {
-        let input_string = &line.unwrap();
-        let x = input_string.split_whitespace();
-        match x.count() {
+        let input_string = match &line {
+            Ok(s) => s,
+            Err(e) => panic!("Error getting lines from input: {}", e),
+        };
+        match &input_string.split_whitespace().count() {
             // Proceed only if the input matches the number of expected parameters.
-            REQUEST_PARAMETERS | UPDATE_PARAMETERS => {
+            &REQUEST_PARAMETERS | &UPDATE_PARAMETERS => {
                 // Check if incoming line is a Request or a Price Update
-                let is_request = io_helpers::is_request(input_string.to_string());
+                //                let is_request = io_helpers::is_request(input_string.to_string());
+                let is_request = input_string.contains(REQUEST_HEADER);
                 if !is_request {
                     // Input was found to be a Price Update not a Exchange Rate Request.
                     let incoming_price_update =
