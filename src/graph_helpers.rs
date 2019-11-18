@@ -25,7 +25,7 @@ pub fn get_index_from_vertex(
     }
 }
 
-pub fn get_path(u: usize, v: usize, next: Compressed<usize>) -> Vec<usize> {
+pub fn get_path(u: usize, v: usize, next: Compressed<usize>) -> Option<Vec<usize>> {
     //    println!("get_path received {} and {}", u, v);
     let mut path: Vec<usize> = Vec::new();
     path.push(u);
@@ -38,7 +38,7 @@ pub fn get_path(u: usize, v: usize, next: Compressed<usize>) -> Vec<usize> {
     }
     //    println!("{}, {}", u, v);
     //    println!("LEN: {}", path.len());
-    return path;
+    return Some(path);
 }
 
 /*

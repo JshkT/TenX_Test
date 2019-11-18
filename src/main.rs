@@ -78,7 +78,6 @@ fn main() {
             // Proceed only if the input matches the number of expected parameters.
             &REQUEST_PARAMETERS | &UPDATE_PARAMETERS => {
                 // Check if incoming line is a Request or a Price Update
-                //                let is_request = io_helpers::is_request(input_string.to_string());
                 let is_request = input_string.contains(REQUEST_HEADER);
                 if !is_request {
                     // Input was found to be a Price Update not a Exchange Rate Request.
@@ -96,6 +95,15 @@ fn main() {
                     };
 
                     // Check if source vertex exists in our data and only add if it does not.
+
+                    //                    let res = match vertex_data
+                    //                        .iter()
+                    //                        .position(|x| x.eq(&vertex_source) | x.eq(&vertex_destination))
+                    //                    {
+                    //                        Some(y) => Some(y),
+                    //                        None => None,
+                    //                    };
+
                     match vertex_data.contains(&vertex_source) {
                         true => {}
                         false => {
@@ -127,11 +135,14 @@ fn main() {
                             // find node index
                             let x = vertex_data.iter().position(|x| x.eq(i));
                             let y = vertex_data.iter().position(|y| y.eq(&vertex_destination));
-                            let res =
-                                graph.find_edge(node_index(x.unwrap()), node_index(y.unwrap()));
+
+                            let x1 = x.map(|n| node_index(n));
+                            let y1 = y.map(|n| node_index(n));
+                            let res = x1.and_then(|x2| y1.and_then(|y2| graph.find_edge(x2, y2)));
+
                             match res {
                                 None => {
-                                    graph.add_edge(
+                                    graph.update_edge(
                                         node_index(x.unwrap()),
                                         node_index(y.unwrap()),
                                         1.0,
@@ -153,11 +164,13 @@ fn main() {
                                     }
                                 }
                             }
-                            let res =
-                                graph.find_edge(node_index(y.unwrap()), node_index(x.unwrap()));
+                            let res = x1.and_then(|x2| y1.and_then(|y2| graph.find_edge(y2, x2)));
+
+                            //                            let res =
+                            //                                graph.find_edge(node_index(y.unwrap()), node_index(x.unwrap()));
                             match res {
                                 None => {
-                                    graph.add_edge(
+                                    graph.update_edge(
                                         node_index(y.unwrap()),
                                         node_index(x.unwrap()),
                                         1.0,
@@ -192,7 +205,7 @@ fn main() {
                                 graph.find_edge(node_index(x.unwrap()), node_index(y.unwrap()));
                             match res {
                                 None => {
-                                    graph.add_edge(
+                                    graph.update_edge(
                                         node_index(x.unwrap()),
                                         node_index(y.unwrap()),
                                         1.0,
@@ -218,7 +231,7 @@ fn main() {
                                 graph.find_edge(node_index(y.unwrap()), node_index(x.unwrap()));
                             match res {
                                 None => {
-                                    graph.add_edge(
+                                    graph.update_edge(
                                         node_index(y.unwrap()),
                                         node_index(x.unwrap()),
                                         1.0,
@@ -282,7 +295,7 @@ fn main() {
                     match edge_i {
                         None => {
                             // If not, simply add new edge.
-                            let e = graph.add_edge(source_node, dest_node, edge_forward.rate);
+                            let e = graph.update_edge(source_node, dest_node, edge_forward.rate);
 
                             edge_index.push(e);
                             edge_data.push(edge_forward);
@@ -314,7 +327,7 @@ fn main() {
                     match edge_i {
                         None => {
                             // If not, simply add new edge.
-                            let e = graph.add_edge(dest_node, source_node, edge_backward.rate);
+                            let e = graph.update_edge(dest_node, source_node, edge_backward.rate);
 
                             edge_index.push(e);
                             edge_data.push(edge_backward);
@@ -450,12 +463,14 @@ fn main() {
                             let dest_index =
                                 get_index_from_vertex(&dest_vertex, &vertex_data, &vertex_index);
 
-                            let u = source_index.unwrap().index();
-                            let v = dest_index.unwrap().index();
+                            let u = source_index.map(|u1| u1.index());
+                            let v = dest_index.map(|v1| v1.index());
+                            let best_rate = u.and_then(|u| v.map(|v| rate.get((u, v))));
 
-                            let best_rate = rate.get((u, v));
+                            //                            let best_rate = u.and_then(|u1| v.and_then(|v1| rate.get((u1, v1))));
+                            //                            let best_rate = rate.get((u, v));
                             println!(
-                                "BEST_RATES_BEGIN <{}> <{}> <{}> <{}> <{}> ",
+                                "BEST_RATES_BEGIN <{}> <{}> <{}> <{}> <{:?}> ",
                                 &source_vertex.exchange,
                                 &source_vertex.currency,
                                 &dest_vertex.exchange,
@@ -463,12 +478,20 @@ fn main() {
                                 best_rate
                             );
 
-                            let path = get_path(u, v, next);
-                            for x in &path {
-                                let exchange = &vertex_data.get(*x).unwrap().exchange;
-                                let currency = &vertex_data.get(*x).unwrap().currency;
-                                println!("<{}, {}>", exchange, currency);
+                            let path = u.and_then(|u| v.and_then(|v| get_path(u, v, next)));
+
+                            //                            path.map(|p| vertex_data.get(p));
+                            match path {
+                                Some(v) => {
+                                    for x in v {
+                                        let exchange = &vertex_data[x].exchange;
+                                        let currency = &vertex_data[x].currency;
+                                        println!("<{}, {}>", exchange, currency);
+                                    }
+                                }
+                                None => println!("Path is impossible"),
                             }
+
                             println!("BEST_RATES_END");
                         } else {
                             println!("Either Source or Destination does not exist yet.");
