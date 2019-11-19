@@ -63,6 +63,7 @@ fn main() {
     let stdin = io::stdin();
 
     let mut graph = Graph::<String, f32>::new();
+
     let mut vertex_data: Vec<Vertex> = Vec::new();
     let mut vertex_index: Vec<NodeIndex> = Vec::new();
 
@@ -165,9 +166,6 @@ fn main() {
                                 }
                             }
                             let res = x1.and_then(|x2| y1.and_then(|y2| graph.find_edge(y2, x2)));
-
-                            //                            let res =
-                            //                                graph.find_edge(node_index(y.unwrap()), node_index(x.unwrap()));
                             match res {
                                 None => {
                                     graph.update_edge(
@@ -276,10 +274,15 @@ fn main() {
                      * incoming price update is more recent than the existing rate.
                      */
                     let source_node =
-                        get_index_from_vertex(&vertex_source, &vertex_data, &vertex_index).unwrap();
+                        get_index_from_vertex(&vertex_source, &vertex_data, &vertex_index);
+
+                    //                    let source_node =
+                    //                        match get_index_from_vertex(&vertex_source, &vertex_data, &vertex_index) {
+                    //                            None => return,
+                    //                            Some(i) => i,
+                    //                        };
                     let dest_node =
-                        get_index_from_vertex(&vertex_destination, &vertex_data, &vertex_index)
-                            .unwrap();
+                        get_index_from_vertex(&vertex_destination, &vertex_data, &vertex_index);
 
                     let edge_forward = Edge {
                         rate: incoming_price_update.forward_factor,
@@ -291,11 +294,18 @@ fn main() {
                     };
 
                     //check if edge between source and dest exists
-                    let edge_i = graph.find_edge(source_node, dest_node);
+                    //                    let edge_i = graph.find_edge(source_node, dest_node);
+                    let edge_i =
+                        source_node.and_then(|u| dest_node.and_then(|v| graph.find_edge(u, v)));
                     match edge_i {
                         None => {
                             // If not, simply add new edge.
-                            let e = graph.update_edge(source_node, dest_node, edge_forward.rate);
+                            //                            let e = source_node.and_then((|u| dest_node.and_then(|v| graph.update_edge(u,v,edge_forward.rate))));
+                            let e = graph.update_edge(
+                                source_node.unwrap(),
+                                dest_node.unwrap(),
+                                edge_forward.rate,
+                            );
 
                             edge_index.push(e);
                             edge_data.push(edge_forward);
@@ -323,11 +333,15 @@ fn main() {
                     }
 
                     // Check reverse direction.
-                    let edge_i = graph.find_edge(dest_node, source_node);
+                    let edge_i = graph.find_edge(dest_node.unwrap(), source_node.unwrap());
                     match edge_i {
                         None => {
                             // If not, simply add new edge.
-                            let e = graph.update_edge(dest_node, source_node, edge_backward.rate);
+                            let e = graph.update_edge(
+                                dest_node.unwrap(),
+                                source_node.unwrap(),
+                                edge_backward.rate,
+                            );
 
                             edge_index.push(e);
                             edge_data.push(edge_backward);
@@ -411,20 +425,12 @@ fn main() {
                     }
 
                     //==============MODIFIED FLOYD-WARSHALL======================
-                    for k in 0..graph.node_count() {
-                        for i in 0..graph.node_count() {
-                            for j in 0..graph.node_count() {
-                                let u = Decimal::from_f32(rate.get((i, j))).unwrap();
-                                let a = Decimal::from_f32(rate.get((i, k))).unwrap();
-                                let b = Decimal::from_f32(rate.get((k, j))).unwrap();
-                                let res = a.checked_mul(b).unwrap();
-                                if u < res {
-                                    rate.set((i, j), Decimal::to_f32(&res).unwrap());
-                                    next.set((i, j), next.get((i, k)));
-                                }
-                            }
-                        }
-                    }
+                    let res = floyd_warshall(&rate, &next, &graph);
+
+                    // Update rate and next tables.
+                    let rate = res.0;
+                    let next = res.1;
+
                     // Turn debug on to see the lookup tables.
                     if DEBUG {
                         println!("========= UPDATED NEXTS ===========");
@@ -502,4 +508,34 @@ fn main() {
             _ => eprintln!("WRONG NUMBER OF INPUTS"),
         }
     }
+}
+
+fn floyd_warshall(
+    rate: &Compressed<f32>,
+    next: &Compressed<usize>,
+    graph: &Graph<String, f32>,
+) -> (Compressed<f32>, Compressed<usize>) {
+    let mut rate_out = rate.clone();
+    let mut next_out = next.clone();
+
+    for k in 0..graph.node_count() {
+        for i in 0..graph.node_count() {
+            for j in 0..graph.node_count() {
+                let u = Decimal::from_f32(rate_out.get((i, j)));
+                let a = Decimal::from_f32(rate_out.get((i, k)));
+                let b = Decimal::from_f32(rate_out.get((k, j)));
+
+                let res = a.and_then(|a| b.and_then(|b| a.checked_mul(b)));
+
+                if let Some(true) = u.and_then(|u| res.map(|res| u < res)) {
+                    let x = res.and_then(|res| Decimal::to_f32(&res));
+
+                    // Set rate and next.
+                    x.map(|x| rate_out.set((i, j), x));
+                    next_out.set((i, j), next.get((i, k)));
+                };
+            }
+        }
+    }
+    return (rate_out, next_out);
 }

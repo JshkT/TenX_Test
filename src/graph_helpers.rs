@@ -6,6 +6,7 @@
 use crate::{Vertex, DEBUG};
 use matrix::prelude::Compressed;
 use petgraph::prelude::NodeIndex;
+use petgraph::Graph;
 
 pub fn get_index_from_vertex(
     v: &Vertex,
@@ -13,14 +14,16 @@ pub fn get_index_from_vertex(
     vertex_index: &Vec<NodeIndex>,
 ) -> Option<NodeIndex> {
     let ind = vertex_data.iter().position(|x| x.eq(v));
+    //    return vertex_index[ind]?;
     match ind {
         None => {
             //            println!("Get index from vertex not found.");
             return None;
         }
-        Some(_0) => {
+        Some(i) => {
             //            println!("Get index found: {}", ind.unwrap());
-            return Option::from(vertex_index[ind.unwrap()]);
+            return Some(vertex_index[i]);
+            //            return ind.and_then(|ind| Option::from(vertex_index[ind]));
         }
     }
 }
@@ -52,3 +55,7 @@ pub fn vertex_string_format(v: &Vertex) -> String {
     }
     return node_str;
 }
+
+//pub fn add_vertex_to_graph(v: &Vertex, g: &Graph<String, f32>) -> Graph<String, f32> {
+//    let node_str = vertex_string_format(&vertex_source);
+//}
