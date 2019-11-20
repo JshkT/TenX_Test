@@ -55,6 +55,7 @@ pub struct ExchangeRateRequest {
 const REQUEST_PARAMETERS: usize = 5;
 const UPDATE_PARAMETERS: usize = 6;
 const REQUEST_HEADER: &str = "EXCHANGE_RATE_REQUEST";
+const DEFAULT_EDGE_WEIGHT: f32 = 1.0;
 const DEBUG: bool = false;
 
 fn main() {
@@ -125,6 +126,15 @@ fn main() {
                     /* The following handles edge creation between vertexes that share
                      * the same currency but different exchanges.
                      */
+
+                    //                    let res = process_edges(
+                    //                        &vertex_destination,
+                    //                        &edge_data,
+                    //                        &incoming_price_update,
+                    //                        graph,
+                    //                    );
+                    //                    let mut graph = res.0.clone();
+                    //                    let mut edge_data = res.1;
                     for i in &vertex_data {
                         if i.currency == vertex_destination.currency {
                             // if edge does not exist.
@@ -188,6 +198,7 @@ fn main() {
                             }
                         }
                     }
+
                     // Second half of checks and adding.
                     for i in &vertex_data {
                         if i.currency == vertex_source.currency {
@@ -464,4 +475,77 @@ pub fn print_results_part_two(path: &Option<Vec<usize>>, graph: &Graph<String, f
         }
         None => println!("There is no path from source to desired destination"),
     }
+}
+
+pub fn process_edges(
+    vertex: &Vertex,
+    edge_data: &Vec<Edge>,
+    incoming_price_update: &PriceUpdate,
+    graph: Graph<String, f32>,
+) -> (Graph<String, f32>, Vec<Edge>) {
+    let mut edge_data = edge_data.clone();
+    for (index, node) in graph.raw_nodes().iter().enumerate() {
+        if node.weight.contains(&vertex.currency) {
+            let dest_index = get_index_from_node(&vertex, &graph);
+
+            let edge_to_dest =
+                dest_index.and_then(|i| graph.find_edge(node_index(index), node_index(i)));
+
+            match edge_to_dest {
+                None => {
+                    let mut graph = graph.clone();
+                    dest_index.map(|dest_index| {
+                        graph.update_edge(
+                            node_index(index),
+                            node_index(dest_index),
+                            DEFAULT_EDGE_WEIGHT,
+                        )
+                    });
+                    edge_data.push(Edge {
+                        rate: DEFAULT_EDGE_WEIGHT,
+                        timestamp: incoming_price_update.timestamp,
+                    });
+                }
+                Some(e) => {
+                    if DEBUG {
+                        println!(
+                            "FOUND EDGE OF INDEX: {:?}, {:?}",
+                            e,
+                            edge_data[e.index()].timestamp
+                        );
+                    }
+                }
+            }
+
+            let edge_to_dest =
+                dest_index.and_then(|i| graph.find_edge(node_index(i), node_index(index)));
+
+            match edge_to_dest {
+                None => {
+                    let mut graph = graph.clone();
+                    dest_index.map(|dest_index| {
+                        graph.update_edge(
+                            node_index(index),
+                            node_index(dest_index),
+                            DEFAULT_EDGE_WEIGHT,
+                        )
+                    });
+                    edge_data.push(Edge {
+                        rate: DEFAULT_EDGE_WEIGHT,
+                        timestamp: incoming_price_update.timestamp,
+                    });
+                }
+                Some(e) => {
+                    if DEBUG {
+                        println!(
+                            "FOUND EDGE OF INDEX: {:?}, {:?}",
+                            e,
+                            edge_data[e.index()].timestamp
+                        );
+                    }
+                }
+            }
+        }
+    }
+    return (graph, edge_data);
 }
