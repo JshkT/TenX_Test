@@ -7,21 +7,7 @@
 //use std::io::prelude::*;
 
 use crate::{datetime_helpers, ExchangeRateRequest, PriceUpdate};
-//use std::collections::LinkedList;
 use std::str::SplitWhitespace;
-
-//pub fn is_request(line_input: String) -> bool {
-//    //    println!("Starting process_line on: {}", line_input);
-//
-//    if line_input.contains("EXCHANGE_RATE_REQUEST") {
-//        //        println!("EXCHANGE_RATE_REQUEST");
-//        //        exchange_rate_request(line_input.split_whitespace());
-//        return true;
-//    } else {
-//        //        price_update(line_input.split_whitespace());
-//        return false;
-//    }
-//}
 
 pub fn exchange_rate_request(input: SplitWhitespace) -> ExchangeRateRequest {
     //    println!("GET EXCHANGE RATE FOR REQUEST:");
@@ -57,6 +43,17 @@ pub fn price_update(input: SplitWhitespace) -> PriceUpdate {
     return pupdate;
 }
 
+pub fn get_node(input_array: [&str; 6]) -> PriceUpdate {
+    let output_price_update = PriceUpdate {
+        timestamp: datetime_helpers::get_datetime(input_array[0]),
+        exchange: input_array[1].to_string(),
+        source_currency: input_array[2].to_string(),
+        destination_currency: input_array[3].to_string(),
+        forward_factor: input_array[4].parse().unwrap(),
+        backward_factor: input_array[5].parse().unwrap(),
+    };
+    return output_price_update;
+}
 //pub fn contents_processor(input_contents: &str) -> LinkedList<[&str; 6]> {
 //    let contlines = input_contents.lines();
 //    let mut cont_elem;
@@ -119,15 +116,3 @@ pub fn price_update(input: SplitWhitespace) -> PriceUpdate {
 //        .expect("Cannot read the file.");
 //    return contents;
 //}
-
-pub fn get_node(input_array: [&str; 6]) -> PriceUpdate {
-    let output_price_update = PriceUpdate {
-        timestamp: datetime_helpers::get_datetime(input_array[0]),
-        exchange: input_array[1].to_string(),
-        source_currency: input_array[2].to_string(),
-        destination_currency: input_array[3].to_string(),
-        forward_factor: input_array[4].parse().unwrap(),
-        backward_factor: input_array[5].parse().unwrap(),
-    };
-    return output_price_update;
-}

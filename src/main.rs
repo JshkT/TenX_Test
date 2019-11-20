@@ -8,7 +8,9 @@ extern crate matrix;
 extern crate petgraph;
 extern crate rust_decimal;
 
-use crate::graph_helpers::{get_index_from_vertex, get_path, vertex_string_format};
+use crate::graph_helpers::{
+    get_index_from_vertex, get_path, modified_floyd_warshall, vertex_string_format,
+};
 use chrono::{DateTime, FixedOffset};
 use matrix::format::compressed::Variant;
 use matrix::prelude::*;
@@ -16,8 +18,6 @@ use petgraph::graph::node_index;
 use petgraph::prelude::NodeIndex;
 use petgraph::stable_graph::EdgeIndex;
 use petgraph::Graph;
-use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
-use rust_decimal::Decimal;
 use std::io;
 use std::io::BufRead;
 
@@ -425,7 +425,7 @@ fn main() {
                     }
 
                     //==============MODIFIED FLOYD-WARSHALL======================
-                    let res = floyd_warshall(&rate, &next, &graph);
+                    let res = modified_floyd_warshall(&rate, &next, &graph);
 
                     // Update rate and next tables.
                     let rate = res.0;
@@ -508,34 +508,4 @@ fn main() {
             _ => eprintln!("WRONG NUMBER OF INPUTS"),
         }
     }
-}
-
-fn floyd_warshall(
-    rate: &Compressed<f32>,
-    next: &Compressed<usize>,
-    graph: &Graph<String, f32>,
-) -> (Compressed<f32>, Compressed<usize>) {
-    let mut rate_out = rate.clone();
-    let mut next_out = next.clone();
-
-    for k in 0..graph.node_count() {
-        for i in 0..graph.node_count() {
-            for j in 0..graph.node_count() {
-                let u = Decimal::from_f32(rate_out.get((i, j)));
-                let a = Decimal::from_f32(rate_out.get((i, k)));
-                let b = Decimal::from_f32(rate_out.get((k, j)));
-
-                let res = a.and_then(|a| b.and_then(|b| a.checked_mul(b)));
-
-                if let Some(true) = u.and_then(|u| res.map(|res| u < res)) {
-                    let x = res.and_then(|res| Decimal::to_f32(&res));
-
-                    // Set rate and next.
-                    x.map(|x| rate_out.set((i, j), x));
-                    next_out.set((i, j), next.get((i, k)));
-                };
-            }
-        }
-    }
-    return (rate_out, next_out);
 }
