@@ -9,7 +9,7 @@ extern crate petgraph;
 extern crate rust_decimal;
 
 use crate::graph_helpers::{
-    get_best_rates, get_index_from_vertex, get_path_from_request, graph_contains,
+    get_best_rates, get_index_from_node, get_path_from_request, graph_contains,
     make_best_rate_table, make_next_table, modified_floyd_warshall, vertex_string_format,
 };
 
@@ -250,8 +250,10 @@ fn main() {
                         }
                     }
 
-                    let source_ind = vertex_data.iter().position(|x| x.eq(&vertex_source));
-                    let dest_ind = vertex_data.iter().position(|x| x.eq(&vertex_destination));
+                    let source_ind = get_index_from_node(&vertex_source, &graph);
+                    //                    let source_ind = vertex_data.iter().position(|x| x.eq(&vertex_source));
+                    let dest_ind = get_index_from_node(&vertex_destination, &graph);
+                    //                    let dest_ind = vertex_data.iter().position(|x| x.eq(&vertex_destination));
 
                     if DEBUG {
                         match source_ind {
@@ -269,16 +271,12 @@ fn main() {
                      * It only adds edges if they are either found not to exist or if the
                      * incoming price update is more recent than the existing rate.
                      */
-                    let source_node =
-                        get_index_from_vertex(&vertex_source, &vertex_data, &vertex_index);
-
                     //                    let source_node =
-                    //                        match get_index_from_vertex(&vertex_source, &vertex_data, &vertex_index) {
-                    //                            None => return,
-                    //                            Some(i) => i,
-                    //                        };
-                    let dest_node =
-                        get_index_from_vertex(&vertex_destination, &vertex_data, &vertex_index);
+                    //                        get_index_from_vertex(&vertex_source, &vertex_data, &vertex_index);
+                    let source_node = get_index_from_node(&vertex_source, &graph);
+                    //                    let dest_node =
+                    //                        get_index_from_vertex(&vertex_destination, &vertex_data, &vertex_index);
+                    let dest_node = get_index_from_node(&vertex_destination, &graph);
 
                     let edge_forward = Edge {
                         rate: incoming_price_update.forward_factor,
@@ -291,26 +289,33 @@ fn main() {
 
                     //check if edge between source and dest exists
                     //                    let edge_i = graph.find_edge(source_node, dest_node);
-                    let edge_i =
-                        source_node.and_then(|u| dest_node.and_then(|v| graph.find_edge(u, v)));
+                    let edge_i = source_node.and_then(|u| {
+                        dest_node.and_then(|v| graph.find_edge(node_index(u), node_index(v)))
+                    });
                     match edge_i {
                         None => {
                             // If not, simply add new edge.
-                            //                            let e = source_node.and_then((|u| dest_node.and_then(|v| graph.update_edge(u,v,edge_forward.rate))));
-                            let e = graph.update_edge(
-                                source_node.unwrap(),
-                                dest_node.unwrap(),
-                                edge_forward.rate,
-                            );
 
-                            edge_index.push(e);
+                            let e = source_node.and_then(|u| {
+                                dest_node.map(|v| {
+                                    graph.update_edge(
+                                        node_index(u),
+                                        node_index(v),
+                                        edge_forward.rate,
+                                    )
+                                })
+                            });
+
+                            e.map(|e| edge_index.push(e));
+                            //                            edge_index.push(e);
                             edge_data.push(edge_forward);
                         }
-                        Some(_0) => {
+                        Some(e_curr) => {
                             // if one exists, only update if the new rate is more recent.
+
                             if datetime_helpers::is_more_recent(
                                 incoming_price_update.timestamp,
-                                edge_data[edge_i.unwrap().index()].timestamp,
+                                edge_data[e_curr.index()].timestamp,
                             ) {
                                 let new_edge = Edge {
                                     rate: incoming_price_update.forward_factor,
@@ -321,7 +326,7 @@ fn main() {
                                     vertex_index[dest_ind.unwrap()],
                                     new_edge.rate,
                                 );
-                                edge_data[edge_i.unwrap().index()] = new_edge;
+                                edge_data[e_curr.index()] = new_edge;
                             } else {
                                 // do nothing.
                             }
@@ -329,17 +334,25 @@ fn main() {
                     }
 
                     // Check reverse direction.
-                    let edge_i = graph.find_edge(dest_node.unwrap(), source_node.unwrap());
+                    //                    let edge_i = graph.find_edge(dest_node.unwrap(), source_node.unwrap());
+                    let edge_i = source_node.and_then(|u| {
+                        dest_node.and_then(|v| graph.find_edge(node_index(v), node_index(u)))
+                    });
                     match edge_i {
                         None => {
                             // If not, simply add new edge.
-                            let e = graph.update_edge(
-                                dest_node.unwrap(),
-                                source_node.unwrap(),
-                                edge_backward.rate,
-                            );
+                            let e = source_node.and_then(|u| {
+                                dest_node.map(|v| {
+                                    graph.update_edge(
+                                        node_index(v),
+                                        node_index(u),
+                                        edge_backward.rate,
+                                    )
+                                })
+                            });
 
-                            edge_index.push(e);
+                            e.map(|e| edge_index.push(e));
+                            //                            edge_index.push(e);
                             edge_data.push(edge_backward);
                         }
                         Some(_0) => {
@@ -363,6 +376,7 @@ fn main() {
                             }
                         }
                     }
+                } else {
                 }
                 /* Nothing new to add
                  *  Proceed to build graph and get best path.

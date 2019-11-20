@@ -8,7 +8,6 @@ use matrix::format::compressed::Variant;
 use matrix::prelude::Compressed;
 use matrix::Matrix;
 use petgraph::graph::node_index;
-use petgraph::prelude::NodeIndex;
 use petgraph::Graph;
 use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
 use rust_decimal::Decimal;
@@ -22,25 +21,25 @@ pub fn get_index_from_node(v: &Vertex, graph: &Graph<String, f32>) -> Option<usi
     return None;
 }
 
-pub fn get_index_from_vertex(
-    v: &Vertex,
-    vertex_data: &Vec<Vertex>,
-    vertex_index: &Vec<NodeIndex>,
-) -> Option<NodeIndex> {
-    let ind = vertex_data.iter().position(|x| x.eq(v));
-    //    return vertex_index[ind]?;
-    match ind {
-        None => {
-            //            println!("Get index from vertex not found.");
-            return None;
-        }
-        Some(i) => {
-            //            println!("Get index found: {}", ind.unwrap());
-            return Some(vertex_index[i]);
-            //            return ind.and_then(|ind| Option::from(vertex_index[ind]));
-        }
-    }
-}
+//pub fn get_index_from_vertex(
+//    v: &Vertex,
+//    vertex_data: &Vec<Vertex>,
+//    vertex_index: &Vec<NodeIndex>,
+//) -> Option<NodeIndex> {
+//    let ind = vertex_data.iter().position(|x| x.eq(v));
+//    //    return vertex_index[ind]?;
+//    match ind {
+//        None => {
+//            //            println!("Get index from vertex not found.");
+//            return None;
+//        }
+//        Some(i) => {
+//            //            println!("Get index found: {}", ind.unwrap());
+//            return Some(vertex_index[i]);
+//            //            return ind.and_then(|ind| Option::from(vertex_index[ind]));
+//        }
+//    }
+//}
 
 pub fn get_path_from_request(
     rate_request: &ExchangeRateRequest,
