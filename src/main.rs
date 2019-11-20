@@ -9,11 +9,11 @@ extern crate petgraph;
 extern crate rust_decimal;
 
 use crate::graph_helpers::{
-    get_index_from_vertex, get_path, modified_floyd_warshall, vertex_string_format,
+    get_best_rates, get_index_from_vertex, get_path_from_request, graph_contains,
+    make_best_rate_table, make_next_table, modified_floyd_warshall, vertex_string_format,
 };
+
 use chrono::{DateTime, FixedOffset};
-use matrix::format::compressed::Variant;
-use matrix::prelude::*;
 use petgraph::graph::node_index;
 use petgraph::prelude::NodeIndex;
 use petgraph::stable_graph::EdgeIndex;
@@ -45,7 +45,7 @@ pub struct Edge {
     rate: f32,
     timestamp: DateTime<FixedOffset>,
 }
-
+#[derive(Clone, Eq, PartialEq)]
 pub struct ExchangeRateRequest {
     source_exchange: String,
     source_currency: String,
@@ -79,6 +79,7 @@ fn main() {
             // Proceed only if the input matches the number of expected parameters.
             &REQUEST_PARAMETERS | &UPDATE_PARAMETERS => {
                 // Check if incoming line is a Request or a Price Update
+
                 let is_request = input_string.contains(REQUEST_HEADER);
                 if !is_request {
                     // Input was found to be a Price Update not a Exchange Rate Request.
@@ -96,33 +97,28 @@ fn main() {
                     };
 
                     // Check if source vertex exists in our data and only add if it does not.
-
-                    //                    let res = match vertex_data
-                    //                        .iter()
-                    //                        .position(|x| x.eq(&vertex_source) | x.eq(&vertex_destination))
-                    //                    {
-                    //                        Some(y) => Some(y),
-                    //                        None => None,
-                    //                    };
-
-                    match vertex_data.contains(&vertex_source) {
-                        true => {}
-                        false => {
-                            let node_str = vertex_string_format(&vertex_source);
-                            let v_source_index = graph.add_node(node_str);
-                            vertex_data.push(vertex_source.clone());
-                            vertex_index.push(v_source_index);
-                        }
+                    if let false = vertex_data.contains(&vertex_source) {
+                        let node_str = vertex_string_format(&vertex_source);
+                        let v_source_index = graph.add_node(node_str);
+                        vertex_data.push(vertex_source.clone());
+                        vertex_index.push(v_source_index);
                     }
                     // Similarly for the destination vertex.
-                    match vertex_data.contains(&vertex_destination) {
-                        true => {}
-                        false => {
-                            let node_str = vertex_string_format(&vertex_destination);
-                            let v_destination_index = graph.add_node(node_str);
-                            vertex_data.push(vertex_destination.clone());
-                            vertex_index.push(v_destination_index);
-                        }
+                    if let false = vertex_data.contains(&vertex_destination) {
+                        let node_str = vertex_string_format(&vertex_destination);
+                        let v_destination_index = graph.add_node(node_str);
+                        vertex_data.push(vertex_destination.clone());
+                        vertex_index.push(v_destination_index);
+                    }
+
+                    if let false = graph_contains(&vertex_source, &graph) {
+                        let node_str = vertex_string_format(&vertex_source);
+                        graph.add_node(node_str);
+                    }
+
+                    if let false = graph_contains(&vertex_destination, &graph) {
+                        let node_str = vertex_string_format(&vertex_destination);
+                        graph.add_node(node_str);
                     }
 
                     // ============ Time to add edges =====================
@@ -367,11 +363,10 @@ fn main() {
                             }
                         }
                     }
-                } else {
-                    /* Nothing new to add
-                     *  Proceed to build graph and get best path.
-                     */
                 }
+                /* Nothing new to add
+                 *  Proceed to build graph and get best path.
+                 */
 
                 if DEBUG {
                     println!("EDGES: {}", graph.edge_count());
@@ -379,50 +374,8 @@ fn main() {
 
                 // Best rate lookup table initialisation. As detailed in the challenge brief.
                 if graph.node_count() > 0 {
-                    let mut rate: Compressed<f32> =
-                        Compressed::zero((graph.node_count(), graph.node_count()));
-                    //Builds Rate lookup table.
-                    for i in &vertex_index {
-                        for j in &vertex_index {
-                            let x = graph.find_edge(*i, *j);
-                            match x {
-                                None => {
-                                    rate.set((i.index(), j.index()), 0.0);
-                                }
-                                Some(_0) => {
-                                    let y = graph.edge_weight(x.unwrap());
-                                    rate.set((i.index(), j.index()), *y.unwrap());
-                                }
-                            }
-                        }
-                    }
-
-                    // Prints out the initial "rate" lookup table.
-                    if DEBUG {
-                        for i in 0..rate.rows {
-                            for j in 0..rate.columns {
-                                print!("{} ", rate.get((i, j)));
-                            }
-                            print!("\n");
-                        }
-                    }
-
-                    let mut next: Compressed<usize> =
-                        Compressed::new((graph.node_count(), graph.node_count()), Variant::Column);
-                    for i in &vertex_index {
-                        for j in &vertex_index {
-                            next.set((i.index(), j.index()), j.index());
-                        }
-                    }
-                    // Prints out the initial "next" lookup table
-                    if DEBUG {
-                        for i in 0..next.rows {
-                            for j in 0..next.columns {
-                                print!("{} ", next.get((i, j)));
-                            }
-                            print!("\n");
-                        }
-                    }
+                    let rate = make_best_rate_table(&graph);
+                    let next = make_next_table(&graph);
 
                     //==============MODIFIED FLOYD-WARSHALL======================
                     let res = modified_floyd_warshall(&rate, &next, &graph);
@@ -448,64 +401,53 @@ fn main() {
                             print!("\n");
                         }
                     }
+                    for (i, item) in graph.raw_nodes().iter().enumerate() {
+                        println!("At {} is item: {:?}", i, item);
+                    }
+                    for (i, item) in graph.raw_edges().iter().enumerate() {
+                        println!("At {} is item: {:?}", i, item);
+                    }
 
                     if is_request {
                         let rate_request =
                             io_helpers::exchange_rate_request(input_string.split_whitespace());
-                        let source_vertex = Vertex {
-                            exchange: rate_request.source_exchange,
-                            currency: rate_request.source_currency,
-                        };
-                        let dest_vertex = Vertex {
-                            exchange: rate_request.destination_exchange,
-                            currency: rate_request.destination_currency,
-                        };
 
-                        if vertex_data.contains(&source_vertex)
-                            && vertex_data.contains(&dest_vertex)
-                        {
-                            let source_index =
-                                get_index_from_vertex(&source_vertex, &vertex_data, &vertex_index);
-                            let dest_index =
-                                get_index_from_vertex(&dest_vertex, &vertex_data, &vertex_index);
+                        let best_rate = get_best_rates(rate_request.clone(), &rate, &graph);
 
-                            let u = source_index.map(|u1| u1.index());
-                            let v = dest_index.map(|v1| v1.index());
-                            let best_rate = u.and_then(|u| v.map(|v| rate.get((u, v))));
+                        best_rate
+                            .map(|best_rate| print_results_part_one(&rate_request, &best_rate));
 
-                            //                            let best_rate = u.and_then(|u1| v.and_then(|v1| rate.get((u1, v1))));
-                            //                            let best_rate = rate.get((u, v));
-                            println!(
-                                "BEST_RATES_BEGIN <{}> <{}> <{}> <{}> <{:?}> ",
-                                &source_vertex.exchange,
-                                &source_vertex.currency,
-                                &dest_vertex.exchange,
-                                &dest_vertex.currency,
-                                best_rate
-                            );
+                        let path = get_path_from_request(&rate_request, &next, &graph);
+                        print_results_part_two(&path, &graph);
+                        //                        path.map(|path| print_results_part_two(path, &graph));
 
-                            let path = u.and_then(|u| v.and_then(|v| get_path(u, v, next)));
-
-                            //                            path.map(|p| vertex_data.get(p));
-                            match path {
-                                Some(v) => {
-                                    for x in v {
-                                        let exchange = &vertex_data[x].exchange;
-                                        let currency = &vertex_data[x].currency;
-                                        println!("<{}, {}>", exchange, currency);
-                                    }
-                                }
-                                None => println!("Path is impossible"),
-                            }
-
-                            println!("BEST_RATES_END");
-                        } else {
-                            println!("Either Source or Destination does not exist yet.");
-                        }
+                        println!("BEST_RATES_END");
                     }
                 }
             }
             _ => eprintln!("WRONG NUMBER OF INPUTS"),
         }
+    }
+}
+
+pub fn print_results_part_one(rate_request: &ExchangeRateRequest, best_rate: &f32) {
+    println!(
+        "BEST_RATES_BEGIN <{}> <{}> <{}> <{}> <{:?}> ",
+        rate_request.source_exchange,
+        rate_request.source_currency,
+        rate_request.destination_exchange,
+        rate_request.destination_currency,
+        best_rate
+    );
+}
+pub fn print_results_part_two(path: &Option<Vec<usize>>, graph: &Graph<String, f32>) {
+    match path {
+        Some(v) => {
+            for x in v {
+                let node_name = graph.node_weight(node_index(*x));
+                node_name.map(|node_name| println!("<{}>", node_name));
+            }
+        }
+        None => println!("There is no path from source to desired destination"),
     }
 }
