@@ -21,7 +21,7 @@ use chrono::{DateTime, FixedOffset};
 use petgraph::graph::node_index;
 use petgraph::Graph;
 use std::io;
-use std::io::BufRead;
+use std::io::{BufRead, BufReader};
 
 mod datetime_helpers;
 mod graph_helpers;
@@ -64,17 +64,21 @@ const DEFAULT_EDGE_WEIGHT: f32 = 1.0;
 const DEBUG: bool = false;
 
 fn main() {
-    let stdin = io::stdin();
-
     let mut graph = Graph::<String, f32>::new();
-    let edge_data: Vec<Edge> = Vec::new();
+    let mut edge_data: Vec<Edge> = Vec::new();
 
     println!("Please enter either a Price Update or an Exchange Rate Request: ");
-    for line in stdin.lock().lines() {
+
+    let stdin = io::stdin();
+    let reader = BufReader::new(stdin);
+
+    let lines = reader.lines();
+    for line in lines {
         let input_string = match &line {
             Ok(s) => s,
             Err(e) => panic!("Error getting lines from input: {}", e),
         };
+
         match &input_string.split_whitespace().count() {
             // Proceed only if the input matches the number of expected parameters.
             &REQUEST_PARAMETERS | &UPDATE_PARAMETERS => {
@@ -187,7 +191,7 @@ fn main() {
 
                     // Update graph and edge_data with our results.
                     graph = res.0;
-                    let edge_data = res.1;
+                    edge_data = res.1;
 
                     /* Do the same for vertex_source's currency.
                      */
@@ -200,7 +204,7 @@ fn main() {
 
                     // Update graph and edge_data with our results.
                     graph = res.0;
-                    let edge_data = res.1;
+                    edge_data = res.1;
 
                     /* The following adds edges as specified in the incoming price update.
                      * It only adds edges if they are either found not to exist or if the
@@ -209,7 +213,6 @@ fn main() {
                      */
                     let source_node_index = get_index_from_node(&vertex_source, &graph);
                     let dest_node_index = get_index_from_node(&vertex_destination, &graph);
-
                     let res = source_node_index.and_then(|source_node_index| {
                         dest_node_index.map(|dest_node_index| {
                             process_edges_between_two_nodes(
@@ -221,6 +224,7 @@ fn main() {
                             )
                         })
                     });
+
                     match res {
                         Some(r) => {
                             graph = r.0;
@@ -234,7 +238,9 @@ fn main() {
                     }
                 }
             }
-            _ => eprintln!("WRONG NUMBER OF INPUTS"),
+            _ => {
+                eprintln!("Inputs must follow the form of a Price Update or Exchange Rate Request")
+            }
         }
     }
 }
