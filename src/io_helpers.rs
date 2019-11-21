@@ -3,10 +3,9 @@
 * (The Exchange Rate Path Problem)
 */
 
-//use std::fs::File;
-//use std::io::prelude::*;
-
 use crate::{datetime_helpers, ExchangeRateRequest, PriceUpdate};
+use petgraph::graph::node_index;
+use petgraph::Graph;
 use std::str::SplitWhitespace;
 
 pub fn exchange_rate_request(input: SplitWhitespace) -> ExchangeRateRequest {
@@ -54,65 +53,25 @@ pub fn get_node(input_array: [&str; 6]) -> PriceUpdate {
     };
     return output_price_update;
 }
-//pub fn contents_processor(input_contents: &str) -> LinkedList<[&str; 6]> {
-//    let contlines = input_contents.lines();
-//    let mut cont_elem;
-//
-//    let mut i = 0;
-//    let mut j = 0;
-//    let mut price_update_array: [&str; 6] = [" "; 6];
-//    let mut request_array: [&str; 4] = [" "; 4];
-//    let mut list: LinkedList<[&str; 6]> = LinkedList::new();
-//
-//    for line in contlines {
-//        //        println!("{}", line);
-//        cont_elem = line.split_whitespace();
-//        let mut is_request = false;
-//        for elem in cont_elem {
-//            //            println!("{}", elem);
-//            if is_request == true {
-//                request_array[j] = elem;
-//                j += 1;
-//                if j >= 4 {
-//                    let request = ExchangeRateRequest {
-//                        source_exchange: request_array[0].to_string(),
-//                        source_currency: request_array[1].to_string(),
-//                        destination_exchange: request_array[2].to_string(),
-//                        destination_currency: request_array[3].to_string(),
-//                    };
-//                    if DEBUG {
-//                        println!(
-//                            "ExchangeRateRequest: {}, {}, {}, {}",
-//                            request.source_exchange,
-//                            request.source_currency,
-//                            request.destination_exchange,
-//                            request.destination_currency
-//                        );
-//                    }
-//
-//                    return list;
-//                }
-//            } else {
-//                is_request = false;
-//                if elem.eq("EXCHANGE_RATE_REQUEST") {
-//                    println!("EXCHANGE_RATE_REQUEST");
-//                    is_request = true;
-//                    // Call function for exchange rate with data currently available.
-//                }
-//                price_update_array[i] = elem;
-//                i += 1;
-//            }
-//        }
-//        list.push_back(price_update_array);
-//        i = 0;
-//    }
-//    return list;
-//}
-//
-//pub fn get_contents_from_txt(input_path: &str) -> String {
-//    let mut file = File::open(input_path).expect("Cannot open file.");
-//    let mut contents = String::new();
-//    file.read_to_string(&mut contents)
-//        .expect("Cannot read the file.");
-//    return contents;
-//}
+
+pub fn print_results_part_one(rate_request: &ExchangeRateRequest, best_rate: &f32) {
+    println!(
+        "BEST_RATES_BEGIN <{}> <{}> <{}> <{}> <{:?}> ",
+        rate_request.source_exchange,
+        rate_request.source_currency,
+        rate_request.destination_exchange,
+        rate_request.destination_currency,
+        best_rate
+    );
+}
+pub fn print_results_part_two(path: &Option<Vec<usize>>, graph: &Graph<String, f32>) {
+    match path {
+        Some(v) => {
+            for x in v {
+                let node_name = graph.node_weight(node_index(*x));
+                node_name.map(|node_name| println!("<{}>", node_name));
+            }
+        }
+        None => println!("There is no path from source to desired destination"),
+    }
+}

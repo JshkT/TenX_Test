@@ -15,6 +15,7 @@ use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
 use rust_decimal::Decimal;
 
 //==============MODIFIED FLOYD-WARSHALL======================
+
 pub fn modified_floyd_warshall(
     rate: &Compressed<f32>,
     next: &Compressed<usize>,
@@ -46,6 +47,13 @@ pub fn modified_floyd_warshall(
     return (rate_out, next_out);
 }
 
+/*
+ *  Takes source and destination nodes as well as the Next lookup table as input
+ *  and returns best path from source to destination if it exists.
+ *  does so with the help of the function get_path_from_index().
+ *  They have been split into two functions so that the function doesn't get overly bloated.
+ *  get_path_from_request acts like an adaptor to be called more easily from the main function.
+ */
 pub fn get_path_from_request(
     rate_request: &ExchangeRateRequest,
     next: &Compressed<usize>,
@@ -68,19 +76,23 @@ pub fn get_path_from_request(
     return path;
 }
 
-pub fn get_path_from_index(u: usize, v: usize, next: &Compressed<usize>) -> Option<Vec<usize>> {
-    //    println!("get_path received {} and {}", u, v);
+/*
+ *  Takes source and destination node indices as well as the Next lookup table as input
+ *  and returns best path from source to destination if it exists.
+ */
+fn get_path_from_index(u: usize, v: usize, next: &Compressed<usize>) -> Option<Vec<usize>> {
     let mut path: Vec<usize> = Vec::new();
     path.push(u);
-    //    println!("{:?}", path.get(u));
     let mut u = u;
     while u != v {
-        //        println!("{}, {}", u, v);
         u = next.get((u, v));
         path.push(u);
     }
-    //    println!("{}, {}", u, v);
-    //    println!("LEN: {}", path.len());
+    if DEBUG {
+        println!("{}, {}", u, v);
+        println!("LEN: {}", path.len());
+    }
+
     return Some(path);
 }
 
@@ -161,5 +173,22 @@ pub fn get_best_rates(
     } else {
         println!("Either Source or Destination does not exist yet.");
         return None;
+    }
+}
+
+pub fn display_rate_table(matrix: &Compressed<f32>) {
+    for i in 0..matrix.rows {
+        for j in 0..matrix.columns {
+            print!("{} ", matrix.get((i, j)));
+        }
+        print!("\n");
+    }
+}
+pub fn display_next_table(matrix: &Compressed<usize>) {
+    for i in 0..matrix.rows {
+        for j in 0..matrix.columns {
+            print!("{} ", matrix.get((i, j)));
+        }
+        print!("\n");
     }
 }

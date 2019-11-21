@@ -12,13 +12,14 @@ use crate::graph_helpers::{
     get_index_from_node, graph_contains, process_edges_between_two_nodes,
     process_edges_same_currency, vertex_string_format,
 };
+use crate::io_helpers::{print_results_part_one, print_results_part_two};
 use crate::modified_floyd_warshall_helpers::{
-    get_best_rates, get_path_from_request, make_best_rate_table, make_next_table,
-    modified_floyd_warshall,
+    display_next_table, display_rate_table, get_best_rates, get_path_from_request,
+    make_best_rate_table, make_next_table, modified_floyd_warshall,
 };
 
 use chrono::{DateTime, FixedOffset};
-use petgraph::graph::node_index;
+use matrix::prelude::Compressed;
 use petgraph::Graph;
 use std::io;
 use std::io::{BufRead, BufReader};
@@ -64,15 +65,15 @@ const DEFAULT_EDGE_WEIGHT: f32 = 1.0;
 const DEBUG: bool = false;
 
 fn main() {
+    // These two need to outlive the line input loop. As such, I've made them mutable.
     let mut graph = Graph::<String, f32>::new();
     let mut edge_data: Vec<Edge> = Vec::new();
 
     println!("Please enter either a Price Update or an Exchange Rate Request: ");
-
     let stdin = io::stdin();
     let reader = BufReader::new(stdin);
-
     let lines = reader.lines();
+
     for line in lines {
         let input_string = match &line {
             Ok(s) => s,
@@ -100,7 +101,7 @@ fn main() {
                         let rate = make_best_rate_table(&graph);
                         let next = make_next_table(&graph);
 
-                        //==============MODIFIED FLOYD-WARSHALL======================
+                        //============== MODIFIED FLOYD-WARSHALL ======================
                         let res = modified_floyd_warshall(&rate, &next, &graph);
 
                         // Update rate and next tables.
@@ -116,19 +117,9 @@ fn main() {
                                 println!("At {} is item: {:?}", i, item);
                             }
                             println!("========= UPDATED NEXTS ===========");
-                            for i in 0..next.rows {
-                                for j in 0..next.columns {
-                                    print!("{} ", next.get((i, j)));
-                                }
-                                print!("\n");
-                            }
+                            display_next_table(&next);
                             println!("========= UPDATED RATES ===========");
-                            for i in 0..rate.rows {
-                                for j in 0..rate.columns {
-                                    print!("{} ", rate.get((i, j)));
-                                }
-                                print!("\n");
-                            }
+                            display_rate_table(&rate);
                         }
 
                         // ========== Process Request ==============
@@ -152,7 +143,7 @@ fn main() {
                     let incoming_price_update =
                         io_helpers::price_update(input_string.split_whitespace());
 
-                    //=============== Adding Vertices =======================================
+                    //======================= Adding Vertices ===============================
                     let vertex_source = Vertex {
                         exchange: incoming_price_update.exchange.clone(),
                         currency: incoming_price_update.source_currency.clone(),
@@ -173,7 +164,7 @@ fn main() {
                         graph.add_node(node_str);
                     }
 
-                    // ============ Time to add edges =====================
+                    // ================ Time to add edges =====================
                     /* The following handles edge creation between vertexes that share
                      * the same currency but different exchanges.
                      *
@@ -242,27 +233,5 @@ fn main() {
                 eprintln!("Inputs must follow the form of a Price Update or Exchange Rate Request")
             }
         }
-    }
-}
-
-pub fn print_results_part_one(rate_request: &ExchangeRateRequest, best_rate: &f32) {
-    println!(
-        "BEST_RATES_BEGIN <{}> <{}> <{}> <{}> <{:?}> ",
-        rate_request.source_exchange,
-        rate_request.source_currency,
-        rate_request.destination_exchange,
-        rate_request.destination_currency,
-        best_rate
-    );
-}
-pub fn print_results_part_two(path: &Option<Vec<usize>>, graph: &Graph<String, f32>) {
-    match path {
-        Some(v) => {
-            for x in v {
-                let node_name = graph.node_weight(node_index(*x));
-                node_name.map(|node_name| println!("<{}>", node_name));
-            }
-        }
-        None => println!("There is no path from source to desired destination"),
     }
 }
