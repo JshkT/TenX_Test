@@ -16,7 +16,7 @@ pub fn get_datetime_from_string(input_string: &str) -> DateTime<FixedOffset> {
 
 pub fn is_more_recent(
     /* Compares two DateTimes and returns true if the candidate is more recent than the existing.
-    */
+     */
     dt_candidate: DateTime<FixedOffset>,
     dt_existing: DateTime<FixedOffset>,
 ) -> bool {
