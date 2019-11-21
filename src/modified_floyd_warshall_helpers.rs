@@ -14,8 +14,13 @@ use petgraph::Graph;
 use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
 use rust_decimal::Decimal;
 
-//==============MODIFIED FLOYD-WARSHALL======================
-
+/* ================================= MODIFIED FLOYD-WARSHALL =================================
+* The modified Floyd-Warshall algorithm used to get the best rate and the path to achieve it.
+* The original algorithm adds edge weights together to get a total however, for our purposes,
+* we are required to multiply them instead to reflect the exchange rates. Furthermore, instead
+* of optimising for the minimum weight, we want to find the maximum rate for the customer.
+*
+*/
 pub fn modified_floyd_warshall(
     rate: &Compressed<f32>,
     next: &Compressed<usize>,
@@ -96,7 +101,9 @@ fn get_path_from_index(u: usize, v: usize, next: &Compressed<usize>) -> Option<V
     return Some(path);
 }
 
-//Builds Rate lookup table.
+/*
+* Builds Rate lookup table as specified in the brief.
+*/
 pub fn make_best_rate_table(graph: &Graph<String, f32>) -> Compressed<f32> {
     let mut rate: Compressed<f32> = Compressed::zero((graph.node_count(), graph.node_count()));
     for i in 0..graph.node_count() {
@@ -116,17 +123,14 @@ pub fn make_best_rate_table(graph: &Graph<String, f32>) -> Compressed<f32> {
 
     // Prints out the initial "rate" lookup table.
     if DEBUG {
-        for i in 0..rate.rows {
-            for j in 0..rate.columns {
-                print!("{} ", rate.get((i, j)));
-            }
-            print!("\n");
-        }
+        display_rate_table(&rate);
     }
     return rate;
 }
 
-// Creates initial state for the "next" lookup table as specified in the brief.
+/*
+* Creates initial state for the "next" lookup table as specified in the brief.
+*/
 pub fn make_next_table(graph: &Graph<String, f32>) -> Compressed<usize> {
     let mut next: Compressed<usize> =
         Compressed::new((graph.node_count(), graph.node_count()), Variant::Column);
@@ -139,17 +143,15 @@ pub fn make_next_table(graph: &Graph<String, f32>) -> Compressed<usize> {
 
     // Prints out the initial "next" lookup table
     if DEBUG {
-        for i in 0..next.rows {
-            for j in 0..next.columns {
-                print!("{} ", next.get((i, j)));
-            }
-            print!("\n");
-        }
+        display_next_table(&next);
     }
 
     return next;
 }
 
+/*
+* Returns the best possible rate given the current data.
+*/
 pub fn get_best_rates(
     rate_request: ExchangeRateRequest,
     rate: &Compressed<f32>,
@@ -176,7 +178,12 @@ pub fn get_best_rates(
     }
 }
 
-pub fn display_rate_table(matrix: &Compressed<f32>) {
+/*
+ * The following functions were written to display the matrix in a more intuitive manner.
+ * Useful for debugging.
+ */
+
+fn display_rate_table(matrix: &Compressed<f32>) {
     for i in 0..matrix.rows {
         for j in 0..matrix.columns {
             print!("{} ", matrix.get((i, j)));
@@ -184,7 +191,8 @@ pub fn display_rate_table(matrix: &Compressed<f32>) {
         print!("\n");
     }
 }
-pub fn display_next_table(matrix: &Compressed<usize>) {
+
+fn display_next_table(matrix: &Compressed<usize>) {
     for i in 0..matrix.rows {
         for j in 0..matrix.columns {
             print!("{} ", matrix.get((i, j)));

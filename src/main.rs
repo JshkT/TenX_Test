@@ -14,8 +14,8 @@ use crate::graph_helpers::{
 };
 use crate::io_helpers::{print_results_part_one, print_results_part_two};
 use crate::modified_floyd_warshall_helpers::{
-    display_next_table, display_rate_table, get_best_rates, get_path_from_request,
-    make_best_rate_table, make_next_table, modified_floyd_warshall,
+    get_best_rates, get_path_from_request, make_best_rate_table, make_next_table,
+    modified_floyd_warshall,
 };
 
 use chrono::{DateTime, FixedOffset};
@@ -63,6 +63,13 @@ const REQUEST_HEADER: &str = "EXCHANGE_RATE_REQUEST";
 const DEFAULT_EDGE_WEIGHT: f32 = 1.0;
 const DEBUG: bool = false;
 
+/* =================================== Start of main function =====================================
+* Running this allows a user to input price updates or exchange rate requests via stdin.
+* The function will take the price updates and build a graph which will be used by the
+* floyd-warshall algorithm to ultimately display to stdout the best exchange rate available at the
+* time as well as the trades required to achieve this rate.
+* More information can be found in the readme.
+*/
 fn main() {
     let mut graph = Graph::<String, f32>::new();
     let mut edge_data: Vec<Edge> = Vec::new();
@@ -104,20 +111,6 @@ fn main() {
                         let res = modified_floyd_warshall(&rate, &next, &graph);
                         let rate = res.0;
                         let next = res.1;
-
-                        // Turn debug on to see the lookup tables.
-                        if DEBUG {
-                            for (i, item) in graph.raw_nodes().iter().enumerate() {
-                                println!("At {} is item: {:?}", i, item);
-                            }
-                            for (i, item) in graph.raw_edges().iter().enumerate() {
-                                println!("At {} is item: {:?}", i, item);
-                            }
-                            println!("========= UPDATED NEXTS ===========");
-                            display_next_table(&next);
-                            println!("========= UPDATED RATES ===========");
-                            display_rate_table(&rate);
-                        }
 
                         /* ========== Process Request ==============
                          *  Parse the request into a struct for clarity.

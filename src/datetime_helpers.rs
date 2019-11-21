@@ -7,11 +7,17 @@ extern crate chrono;
 
 use chrono::{DateTime, FixedOffset};
 
-pub fn get_datetime(input_string: &str) -> DateTime<FixedOffset> {
+/*
+* Takes a string and returns it in the form DateTime<FixedOffset>
+*/
+pub fn get_datetime_from_string(input_string: &str) -> DateTime<FixedOffset> {
     let dt = DateTime::parse_from_rfc3339(input_string);
     return dt.unwrap();
 }
 
+/*
+* Compares two DateTimes and returns true if the candidate is more recent than the existing.
+*/
 pub fn is_more_recent(
     dt_candidate: DateTime<FixedOffset>,
     dt_existing: DateTime<FixedOffset>,

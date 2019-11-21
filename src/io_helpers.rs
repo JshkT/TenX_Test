@@ -44,7 +44,7 @@ pub fn price_update(input: SplitWhitespace) -> PriceUpdate {
 
 pub fn get_node(input_array: [&str; 6]) -> PriceUpdate {
     let output_price_update = PriceUpdate {
-        timestamp: datetime_helpers::get_datetime(input_array[0]),
+        timestamp: datetime_helpers::get_datetime_from_string(input_array[0]),
         exchange: input_array[1].to_string(),
         source_currency: input_array[2].to_string(),
         destination_currency: input_array[3].to_string(),
