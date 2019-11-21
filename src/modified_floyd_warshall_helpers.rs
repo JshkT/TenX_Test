@@ -14,14 +14,13 @@ use petgraph::Graph;
 use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
 use rust_decimal::Decimal;
 
-/* ================================= MODIFIED FLOYD-WARSHALL =================================
-* The modified Floyd-Warshall algorithm used to get the best rate and the path to achieve it.
-* The original algorithm adds edge weights together to get a total however, for our purposes,
-* we are required to multiply them instead to reflect the exchange rates. Furthermore, instead
-* of optimising for the minimum weight, we want to find the maximum rate for the customer.
-*
-*/
 pub fn modified_floyd_warshall(
+    /* ================================= MODIFIED FLOYD-WARSHALL =================================
+     * The modified Floyd-Warshall algorithm used to get the best rate and the path to achieve it.
+     * The original algorithm adds edge weights together to get a total however, for our purposes,
+     * we are required to multiply them instead to reflect the exchange rates. Furthermore, instead
+     * of optimising for the minimum weight, we want to find the maximum rate for the customer.
+     */
     rate: &Compressed<f32>,
     next: &Compressed<usize>,
     graph: &Graph<String, f32>,
@@ -52,14 +51,13 @@ pub fn modified_floyd_warshall(
     return (rate_out, next_out);
 }
 
-/*
- *  Takes source and destination nodes as well as the Next lookup table as input
- *  and returns best path from source to destination if it exists.
- *  does so with the help of the function get_path_from_index().
- *  They have been split into two functions so that the function doesn't get overly bloated.
- *  get_path_from_request acts like an adaptor to be called more easily from the main function.
- */
 pub fn get_path_from_request(
+    /*  Takes source and destination nodes as well as the Next lookup table as input
+     *  and returns best path from source to destination if it exists.
+     *  does so with the help of the function get_path_from_index().
+     *  They have been split into two functions so that the function doesn't get overly bloated.
+     *  get_path_from_request acts like an adaptor to be called more easily from the main function.
+     */
     rate_request: &ExchangeRateRequest,
     next: &Compressed<usize>,
     graph: &Graph<String, f32>,
@@ -81,11 +79,10 @@ pub fn get_path_from_request(
     return path;
 }
 
-/*
- *  Takes source and destination node indices as well as the Next lookup table as input
- *  and returns best path from source to destination if it exists.
- */
 fn get_path_from_index(u: usize, v: usize, next: &Compressed<usize>) -> Option<Vec<usize>> {
+    /*  Takes source and destination node indices as well as the Next lookup table as input
+     *  and returns best path from source to destination if it exists.
+     */
     let mut path: Vec<usize> = Vec::new();
     path.push(u);
     let mut u = u;
@@ -101,10 +98,10 @@ fn get_path_from_index(u: usize, v: usize, next: &Compressed<usize>) -> Option<V
     return Some(path);
 }
 
-/*
-* Builds Rate lookup table as specified in the brief.
-*/
 pub fn make_best_rate_table(graph: &Graph<String, f32>) -> Compressed<f32> {
+    /* Builds Rate lookup table as specified in the brief.
+     *
+     */
     let mut rate: Compressed<f32> = Compressed::zero((graph.node_count(), graph.node_count()));
     for i in 0..graph.node_count() {
         for j in 0..graph.node_count() {
@@ -128,10 +125,10 @@ pub fn make_best_rate_table(graph: &Graph<String, f32>) -> Compressed<f32> {
     return rate;
 }
 
-/*
-* Creates initial state for the "next" lookup table as specified in the brief.
-*/
 pub fn make_next_table(graph: &Graph<String, f32>) -> Compressed<usize> {
+    /* Creates initial state for the "next" lookup table as specified in the brief.
+     *
+     */
     let mut next: Compressed<usize> =
         Compressed::new((graph.node_count(), graph.node_count()), Variant::Column);
 
@@ -149,10 +146,9 @@ pub fn make_next_table(graph: &Graph<String, f32>) -> Compressed<usize> {
     return next;
 }
 
-/*
-* Returns the best possible rate given the current data.
-*/
 pub fn get_best_rates(
+    /* Returns the best possible rate given the current data.
+     */
     rate_request: ExchangeRateRequest,
     rate: &Compressed<f32>,
     graph: &Graph<String, f32>,
@@ -178,11 +174,9 @@ pub fn get_best_rates(
     }
 }
 
-/*
- * The following functions were written to display the matrix in a more intuitive manner.
+/* The following two functions were written to display the matrix in a more intuitive manner.
  * Useful for debugging.
  */
-
 fn display_rate_table(matrix: &Compressed<f32>) {
     for i in 0..matrix.rows {
         for j in 0..matrix.columns {

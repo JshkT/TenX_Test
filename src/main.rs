@@ -63,14 +63,14 @@ const REQUEST_HEADER: &str = "EXCHANGE_RATE_REQUEST";
 const DEFAULT_EDGE_WEIGHT: f32 = 1.0;
 const DEBUG: bool = false;
 
-/* =================================== Start of main function =====================================
-* Running this allows a user to input price updates or exchange rate requests via stdin.
-* The function will take the price updates and build a graph which will be used by the
-* floyd-warshall algorithm to ultimately display to stdout the best exchange rate available at the
-* time as well as the trades required to achieve this rate.
-* More information can be found in the readme.
-*/
 fn main() {
+    /* =================================== Start of main function ==================================
+     * Running this allows a user to input price updates or exchange rate requests via stdin.
+     * The function will take the price updates and build a graph which will be used by the
+     * floyd-warshall algorithm to ultimately display to stdout the best exchange rate available
+     * at the time as well as the trades required to achieve this rate.
+     * More information can be found in the readme.
+     */
     let mut graph = Graph::<String, f32>::new();
     let mut edge_data: Vec<Edge> = Vec::new();
 

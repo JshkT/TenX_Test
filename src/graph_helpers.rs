@@ -10,6 +10,9 @@ use petgraph::graph::node_index;
 use petgraph::Graph;
 
 pub fn get_index_from_node(v: &Vertex, graph: &Graph<String, f32>) -> Option<usize> {
+    /* Takes a target vertex and a graph as input and returns
+     * the index of the vertex in the graph if it exists.
+     */
     for (i, item) in graph.raw_nodes().iter().enumerate() {
         if let true = item.weight.contains(&vertex_string_format(&v)) {
             return Some(i);
@@ -18,11 +21,10 @@ pub fn get_index_from_node(v: &Vertex, graph: &Graph<String, f32>) -> Option<usi
     return None;
 }
 
-/*
-Formats as "<exchange> <currency>" to be used as vertex weights.
-Doing this mainly to make the graph easier to keep track of.
-*/
 pub fn vertex_string_format(v: &Vertex) -> String {
+    /* Formats as "<exchange> <currency>" to be used as vertex weights.
+     * Doing this mainly to make the graph easier to keep track of.
+     */
     let node_str = format!("{}, {}", &v.exchange, &v.currency);
     if DEBUG {
         println!("{}", &node_str);
@@ -31,6 +33,9 @@ pub fn vertex_string_format(v: &Vertex) -> String {
 }
 
 pub fn graph_contains(v: &Vertex, g: &Graph<String, f32>) -> bool {
+    /* Simple function that checks if a target vertex
+     * exists in the graph.
+     */
     for item in g.raw_nodes() {
         if item.weight.eq(&vertex_string_format(v)) {
             return true;
@@ -45,6 +50,14 @@ pub fn process_edges_same_currency(
     incoming_price_update: &PriceUpdate,
     graph: &Graph<String, f32>,
 ) -> (Graph<String, f32>, Vec<Edge>) {
+    /* First part of processing edges.
+     * This function is responsible for adding edges between
+     * all vertices that share the same currency. For any node that shares the same currency,
+     * the rate is 1 to 1. From the brief, we assume that the user does not make or lose money
+     * by simply moving his currency from one exchange to another without converting anything.
+     * This 1 to 1 exchange rate also applies to the current node. We create an edge to itself
+     * to model that it technically also has a 1 to 1 exchange rate.
+     */
     let mut edge_data = edge_data.clone();
     let mut graph: Graph<String, f32> = graph.clone();
 
@@ -137,6 +150,11 @@ pub fn process_edges_between_two_nodes(
     edge_data: &Vec<Edge>,
     graph: &Graph<String, f32>,
 ) -> (Graph<String, f32>, Vec<Edge>) {
+    /* This is the second part of processing edges.
+     * This function is responsible for creating the edges
+     * between the source node and destination node described in the incoming price update.
+     * It will only update an edge if the timestamp is more recent than the existing edge.
+     */
     let mut graph = graph.clone();
     let mut edge_data = edge_data.clone();
 
