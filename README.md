@@ -53,8 +53,8 @@ BEST_RATES_END
 ```
 
 ### TODO
-- Plenty of room to refactor and clean up
-- Write helper functions to help move the clutter from main.rs
+~~- Plenty of room to refactor and clean up~~
+~~- Write helper functions to help move the clutter from main.rs~~
 - Write tests
 - More error handling
 
