@@ -19,7 +19,6 @@ use crate::modified_floyd_warshall_helpers::{
 };
 
 use chrono::{DateTime, FixedOffset};
-use matrix::prelude::Compressed;
 use petgraph::Graph;
 use std::io;
 use std::io::{BufRead, BufReader};
@@ -65,7 +64,6 @@ const DEFAULT_EDGE_WEIGHT: f32 = 1.0;
 const DEBUG: bool = false;
 
 fn main() {
-    // These two need to outlive the line input loop. As such, I've made them mutable.
     let mut graph = Graph::<String, f32>::new();
     let mut edge_data: Vec<Edge> = Vec::new();
 
@@ -229,11 +227,7 @@ fn main() {
                     match res {
                         Some(r) => {
                             graph = r.0;
-                            /*  Don't need to update edge_data here because
-                             *  there is nothing left to pass that information to.
-                             *  We will have to rebuild it when the next update comes in.
-                             *  If a request comes in, it isn't used so no need to preserve it.
-                             */
+                            edge_data = r.1;
                         }
                         None => println!("There was a problem adding edges between nodes."),
                     }

@@ -68,12 +68,14 @@ pub fn process_edges_same_currency(
                             incoming_price_update.timestamp,
                         ))
                     });
-                    edge_data.push(Edge {
-                        source_index: index,
-                        dest_index: dest_index.unwrap(),
-                        rate: DEFAULT_EDGE_WEIGHT,
-                        timestamp: incoming_price_update.timestamp,
-                    });
+                    if let Some(i) = dest_index {
+                        edge_data.push(Edge {
+                            source_index: index,
+                            dest_index: i,
+                            rate: DEFAULT_EDGE_WEIGHT,
+                            timestamp: incoming_price_update.timestamp,
+                        });
+                    }
                 }
                 Some(e) => {
                     if DEBUG {
@@ -100,12 +102,14 @@ pub fn process_edges_same_currency(
                         ))
                     });
 
-                    edge_data.push(Edge {
-                        source_index: dest_index.unwrap(),
-                        dest_index: index,
-                        rate: DEFAULT_EDGE_WEIGHT,
-                        timestamp: incoming_price_update.timestamp,
-                    });
+                    if let Some(i) = dest_index {
+                        edge_data.push(Edge {
+                            source_index: i,
+                            dest_index: index,
+                            rate: DEFAULT_EDGE_WEIGHT,
+                            timestamp: incoming_price_update.timestamp,
+                        });
+                    }
                 }
                 Some(e) => {
                     if DEBUG {
