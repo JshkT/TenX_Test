@@ -89,22 +89,21 @@ fn main() {
 
                 if is_request {
                     /* If incoming line is a request, Nothing new to add
-                     *  Proceed to build graph and get best path.
+                     *  Proceed to build rate/next tables and get best path.
                      */
 
-                    if DEBUG {
-                        println!("EDGES: {}", graph.edge_count());
-                    }
-
-                    // Best rate lookup table initialisation. As detailed in the challenge brief.
                     if graph.node_count() > 0 {
+                        /* Initialise best rate and next tables as defined in the challenge brief.
+                         * I've used helper functions for this to keep the main function clean.
+                         */
                         let rate = make_best_rate_table(&graph);
                         let next = make_next_table(&graph);
 
                         //============== MODIFIED FLOYD-WARSHALL ======================
+                        /* Run the algorithm to get the best rates and next tables for our graph
+                         * and update both lookup tables with the results.
+                         */
                         let res = modified_floyd_warshall(&rate, &next, &graph);
-
-                        // Update rate and next tables.
                         let rate = res.0;
                         let next = res.1;
 
@@ -122,10 +121,20 @@ fn main() {
                             display_rate_table(&rate);
                         }
 
-                        // ========== Process Request ==============
+                        /* ========== Process Request ==============
+                         *  Parse the request into a struct for clarity.
+                         *  Send the rate_request to our helper function get_best_rates
+                         *  which willl ookup and return the best possible rate between
+                         *  the desired source and destination.
+                         *
+                         *  We then send the rate_request to get_path_from_request to get the
+                         *  path required to achieve our best rate.
+                         *
+                         *  The results are displayed to the user by
+                         *  using the print_results functions.
+                         */
                         let rate_request =
                             io_helpers::exchange_rate_request(input_string.split_whitespace());
-                        //                        println!("{:?}", rate);
 
                         let best_rate = get_best_rates(rate_request.clone(), &rate, &graph);
 
@@ -134,7 +143,6 @@ fn main() {
 
                         let path = get_path_from_request(&rate_request, &next, &graph);
                         print_results_part_two(&path, &graph);
-                        //                        path.map(|path| print_results_part_two(path, &graph));
 
                         println!("BEST_RATES_END");
                     }
@@ -143,7 +151,10 @@ fn main() {
                     let incoming_price_update =
                         io_helpers::price_update(input_string.split_whitespace());
 
-                    //======================= Adding Vertices ===============================
+                    /* ======================= Adding Vertices ===============================
+                     * Check if source and/or destination vertices already exist in our graph
+                     * and only add one or both do not.
+                     */
                     let vertex_source = Vertex {
                         exchange: incoming_price_update.exchange.clone(),
                         currency: incoming_price_update.source_currency.clone(),
@@ -153,7 +164,6 @@ fn main() {
                         currency: incoming_price_update.destination_currency.clone(),
                     };
 
-                    // Check if source vertex exists in our data and only add if it does not.
                     if let false = graph_contains(&vertex_source, &graph) {
                         let node_str = vertex_string_format(&vertex_source);
                         graph.add_node(node_str);
@@ -164,7 +174,7 @@ fn main() {
                         graph.add_node(node_str);
                     }
 
-                    // ================ Time to add edges =====================
+                    // ====================== Adding edges ======================
                     /* The following handles edge creation between vertexes that share
                      * the same currency but different exchanges.
                      *
