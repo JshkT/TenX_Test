@@ -5,27 +5,35 @@
 
 extern crate chrono;
 
-use crate::DEBUG;
 use chrono::{DateTime, FixedOffset};
 
-pub fn get_datetime(input_string: &str) -> DateTime<FixedOffset> {
+pub fn get_datetime_from_string(input_string: &str) -> DateTime<FixedOffset> {
+    /* Takes a string and returns it in the form DateTime<FixedOffset>
+     */
     let dt = DateTime::parse_from_rfc3339(input_string);
     return dt.unwrap();
 }
 
 pub fn is_more_recent(
+    /* Compares two DateTimes and returns true if the candidate is more recent than the existing.
+     */
     dt_candidate: DateTime<FixedOffset>,
     dt_existing: DateTime<FixedOffset>,
 ) -> bool {
-    if dt_candidate > dt_existing {
-        if DEBUG {
-            println!("dt_candidate is more recent: {}", dt_candidate);
+    let diff = dt_candidate - dt_existing;
+    //    let diff = dt_existing - dt_candidate;
+    let diff_nano = chrono::Duration::num_nanoseconds(&diff);
+
+    match diff_nano {
+        Some(t) => {
+            if t > 0 {
+                return true;
+            } else {
+                return false;
+            }
         }
-        return true;
-    } else {
-        if DEBUG {
-            println!("dt_existing is more recent: {}", dt_existing);
+        None => {
+            return false;
         }
-        return false;
     }
 }
