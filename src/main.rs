@@ -9,14 +9,17 @@ extern crate petgraph;
 extern crate rust_decimal;
 
 use crate::graph_helpers::{
-    get_best_rates, get_index_from_node, get_path_from_request, graph_contains,
-    make_best_rate_table, make_next_table, modified_floyd_warshall, vertex_string_format,
+    get_index_from_node, graph_contains, process_edges_between_two_nodes,
+    process_edges_same_currency, vertex_string_format,
+};
+use crate::modified_floyd_warshall_helpers::{
+    get_best_rates, get_path_from_request, make_best_rate_table, make_next_table,
+    modified_floyd_warshall,
 };
 
 use chrono::{DateTime, FixedOffset};
 use petgraph::graph::node_index;
 use petgraph::prelude::NodeIndex;
-use petgraph::stable_graph::EdgeIndex;
 use petgraph::Graph;
 use std::io;
 use std::io::BufRead;
@@ -24,6 +27,7 @@ use std::io::BufRead;
 mod datetime_helpers;
 mod graph_helpers;
 mod io_helpers;
+mod modified_floyd_warshall_helpers;
 
 pub struct PriceUpdate {
     timestamp: DateTime<FixedOffset>,
@@ -40,8 +44,10 @@ pub struct Vertex {
     currency: String,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct Edge {
+    source_index: usize,
+    dest_index: usize,
     rate: f32,
     timestamp: DateTime<FixedOffset>,
 }
@@ -68,7 +74,6 @@ fn main() {
     let mut vertex_data: Vec<Vertex> = Vec::new();
     let mut vertex_index: Vec<NodeIndex> = Vec::new();
 
-    let mut edge_index: Vec<EdgeIndex> = Vec::new();
     let mut edge_data: Vec<Edge> = Vec::new();
 
     for line in stdin.lock().lines() {
@@ -82,7 +87,70 @@ fn main() {
                 // Check if incoming line is a Request or a Price Update
 
                 let is_request = input_string.contains(REQUEST_HEADER);
-                if !is_request {
+
+                if is_request {
+                    /* If incoming line is a request, Nothing new to add
+                     *  Proceed to build graph and get best path.
+                     */
+
+                    if DEBUG {
+                        println!("EDGES: {}", graph.edge_count());
+                    }
+
+                    // Best rate lookup table initialisation. As detailed in the challenge brief.
+                    if graph.node_count() > 0 {
+                        let rate = make_best_rate_table(&graph);
+                        let next = make_next_table(&graph);
+
+                        //==============MODIFIED FLOYD-WARSHALL======================
+                        let res = modified_floyd_warshall(&rate, &next, &graph);
+
+                        // Update rate and next tables.
+                        let rate = res.0;
+                        let next = res.1;
+
+                        // Turn debug on to see the lookup tables.
+                        if DEBUG {
+                            println!("========= UPDATED NEXTS ===========");
+                            for i in 0..next.rows {
+                                for j in 0..next.columns {
+                                    print!("{} ", next.get((i, j)));
+                                }
+                                print!("\n");
+                            }
+                            println!("========= UPDATED RATES ===========");
+                            for i in 0..rate.rows {
+                                for j in 0..rate.columns {
+                                    print!("{} ", rate.get((i, j)));
+                                }
+                                print!("\n");
+                            }
+                        }
+                        for (i, item) in graph.raw_nodes().iter().enumerate() {
+                            println!("At {} is item: {:?}", i, item);
+                        }
+                        for (i, item) in graph.raw_edges().iter().enumerate() {
+                            println!("At {} is item: {:?}", i, item);
+                        }
+
+                        if is_request {
+                            let rate_request =
+                                io_helpers::exchange_rate_request(input_string.split_whitespace());
+                            println!("{:?}", rate);
+
+                            let best_rate = get_best_rates(rate_request.clone(), &rate, &graph);
+
+                            best_rate
+                                .map(|best_rate| print_results_part_one(&rate_request, &best_rate));
+
+                            let path = get_path_from_request(&rate_request, &next, &graph);
+                            print_results_part_two(&path, &graph);
+                            //                        path.map(|path| print_results_part_two(path, &graph));
+
+                            println!("BEST_RATES_END");
+                        }
+                    }
+                } else {
                     // Input was found to be a Price Update not a Exchange Rate Request.
                     let incoming_price_update =
                         io_helpers::price_update(input_string.split_whitespace());
@@ -125,328 +193,61 @@ fn main() {
                     // ============ Time to add edges =====================
                     /* The following handles edge creation between vertexes that share
                      * the same currency but different exchanges.
+                     *
+                     *  Check if vertex_destination can connect to other exchanges
+                     *  that support that currency. Ignores if edge between those already exists.
+                     *  adds a new edge of weight between them if it does not exist.
+                     *  This includes an edge to itself with a weight of 1.0.
                      */
+                    let res = process_edges_same_currency(
+                        &vertex_destination,
+                        &edge_data,
+                        &incoming_price_update,
+                        &graph,
+                    );
 
-                    //                    let res = process_edges(
-                    //                        &vertex_destination,
-                    //                        &edge_data,
-                    //                        &incoming_price_update,
-                    //                        graph,
-                    //                    );
-                    //                    let mut graph = res.0.clone();
-                    //                    let mut edge_data = res.1;
-                    for i in &vertex_data {
-                        if i.currency == vertex_destination.currency {
-                            // if edge does not exist.
-                            //                            println!("dest ADD EDGE HERE {} to {}", i.exchange, vertex_destination.exchange);
-                            // find node index
-                            let x = vertex_data.iter().position(|x| x.eq(i));
-                            let y = vertex_data.iter().position(|y| y.eq(&vertex_destination));
+                    // Update graph and edge_data with our results.
+                    graph = res.0;
+                    edge_data = res.1;
 
-                            let x1 = x.map(|n| node_index(n));
-                            let y1 = y.map(|n| node_index(n));
-                            let res = x1.and_then(|x2| y1.and_then(|y2| graph.find_edge(x2, y2)));
+                    /* Do the same for vertex_source's currency.
+                     */
+                    let res = process_edges_same_currency(
+                        &vertex_source,
+                        &edge_data,
+                        &incoming_price_update,
+                        &graph,
+                    );
 
-                            match res {
-                                None => {
-                                    graph.update_edge(
-                                        node_index(x.unwrap()),
-                                        node_index(y.unwrap()),
-                                        1.0,
-                                    );
-                                    edge_data.push(Edge {
-                                        rate: 1.0,
-                                        timestamp: incoming_price_update.timestamp,
-                                    });
-                                    if DEBUG {
-                                        println!(
-                                            "NO EDGE WAS FOUND BETWEEN {} AND {}.",
-                                            i.exchange, vertex_destination.exchange
-                                        );
-                                    }
-                                }
-                                Some(_0) => {
-                                    if DEBUG {
-                                        println!("FOUND EDGE OF INDEX: {:?}", res.unwrap());
-                                    }
-                                }
-                            }
-                            let res = x1.and_then(|x2| y1.and_then(|y2| graph.find_edge(y2, x2)));
-                            match res {
-                                None => {
-                                    graph.update_edge(
-                                        node_index(y.unwrap()),
-                                        node_index(x.unwrap()),
-                                        1.0,
-                                    );
-                                    edge_data.push(Edge {
-                                        rate: 1.0,
-                                        timestamp: incoming_price_update.timestamp,
-                                    });
-                                    if DEBUG {
-                                        println!(
-                                            "NO EDGE WAS FOUND BETWEEN {} AND {}.",
-                                            i.exchange, vertex_destination.exchange
-                                        );
-                                    }
-                                }
-                                Some(_0) => {
-                                    if DEBUG {
-                                        println!("FOUND EDGE OF INDEX: {:?}", res.unwrap());
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Second half of checks and adding.
-                    for i in &vertex_data {
-                        if i.currency == vertex_source.currency {
-                            // if edge does not exist.
-                            // find node index
-                            let x = vertex_data.iter().position(|x| x.eq(i));
-                            let y = vertex_data.iter().position(|y| y.eq(&vertex_source));
-                            let res =
-                                graph.find_edge(node_index(x.unwrap()), node_index(y.unwrap()));
-                            match res {
-                                None => {
-                                    graph.update_edge(
-                                        node_index(x.unwrap()),
-                                        node_index(y.unwrap()),
-                                        1.0,
-                                    );
-                                    edge_data.push(Edge {
-                                        rate: 1.0,
-                                        timestamp: incoming_price_update.timestamp,
-                                    });
-                                    if DEBUG {
-                                        println!(
-                                            "NO EDGE WAS FOUND BETWEEN {} AND {}.",
-                                            i.exchange, vertex_source.exchange
-                                        );
-                                    }
-                                }
-                                Some(_0) => {
-                                    if DEBUG {
-                                        println!("FOUND EDGE OF INDEX: {:?}", res.unwrap())
-                                    }
-                                }
-                            }
-                            let res =
-                                graph.find_edge(node_index(y.unwrap()), node_index(x.unwrap()));
-                            match res {
-                                None => {
-                                    graph.update_edge(
-                                        node_index(y.unwrap()),
-                                        node_index(x.unwrap()),
-                                        1.0,
-                                    );
-                                    edge_data.push(Edge {
-                                        rate: 1.0,
-                                        timestamp: incoming_price_update.timestamp,
-                                    });
-                                    if DEBUG {
-                                        println!(
-                                            "NO EDGE WAS FOUND BETWEEN {} AND {}.",
-                                            i.exchange, vertex_source.exchange
-                                        );
-                                    }
-                                }
-                                Some(_0) => {
-                                    if DEBUG {
-                                        println!("FOUND EDGE OF INDEX: {:?}", res.unwrap());
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    let source_ind = get_index_from_node(&vertex_source, &graph);
-                    //                    let source_ind = vertex_data.iter().position(|x| x.eq(&vertex_source));
-                    let dest_ind = get_index_from_node(&vertex_destination, &graph);
-                    //                    let dest_ind = vertex_data.iter().position(|x| x.eq(&vertex_destination));
-
-                    if DEBUG {
-                        match source_ind {
-                            None => println!("NOT FOUND"),
-                            Some(_0) => println!("Found source at index: {}", source_ind.unwrap()),
-                        }
-
-                        match dest_ind {
-                            None => println!("NOT FOUND"),
-                            Some(_0) => println!("Found dest at index: {}", dest_ind.unwrap()),
-                        }
-                    }
+                    // Update graph and edge_data with our results.
+                    graph = res.0;
+                    edge_data = res.1;
 
                     /* The following adds edges as specified in the incoming price update.
                      * It only adds edges if they are either found not to exist or if the
                      * incoming price update is more recent than the existing rate.
+                     * This is done through the function process_edges_between_two_nodes.
                      */
-                    //                    let source_node =
-                    //                        get_index_from_vertex(&vertex_source, &vertex_data, &vertex_index);
-                    let source_node = get_index_from_node(&vertex_source, &graph);
-                    //                    let dest_node =
-                    //                        get_index_from_vertex(&vertex_destination, &vertex_data, &vertex_index);
-                    let dest_node = get_index_from_node(&vertex_destination, &graph);
+                    let source_node_index = get_index_from_node(&vertex_source, &graph);
+                    let dest_node_index = get_index_from_node(&vertex_destination, &graph);
 
-                    let edge_forward = Edge {
-                        rate: incoming_price_update.forward_factor,
-                        timestamp: incoming_price_update.timestamp,
-                    };
-                    let edge_backward = Edge {
-                        rate: incoming_price_update.backward_factor,
-                        timestamp: incoming_price_update.timestamp,
-                    };
-
-                    //check if edge between source and dest exists
-                    //                    let edge_i = graph.find_edge(source_node, dest_node);
-                    let edge_i = source_node.and_then(|u| {
-                        dest_node.and_then(|v| graph.find_edge(node_index(u), node_index(v)))
+                    let res = source_node_index.and_then(|source_node_index| {
+                        dest_node_index.map(|dest_node_index| {
+                            process_edges_between_two_nodes(
+                                source_node_index,
+                                dest_node_index,
+                                &incoming_price_update,
+                                &edge_data,
+                                &graph,
+                            )
+                        })
                     });
-                    match edge_i {
-                        None => {
-                            // If not, simply add new edge.
-
-                            let e = source_node.and_then(|u| {
-                                dest_node.map(|v| {
-                                    graph.update_edge(
-                                        node_index(u),
-                                        node_index(v),
-                                        edge_forward.rate,
-                                    )
-                                })
-                            });
-
-                            e.map(|e| edge_index.push(e));
-                            //                            edge_index.push(e);
-                            edge_data.push(edge_forward);
+                    match res {
+                        Some(r) => {
+                            graph = r.0;
+                            edge_data = r.1;
                         }
-                        Some(e_curr) => {
-                            // if one exists, only update if the new rate is more recent.
-
-                            if datetime_helpers::is_more_recent(
-                                incoming_price_update.timestamp,
-                                edge_data[e_curr.index()].timestamp,
-                            ) {
-                                let new_edge = Edge {
-                                    rate: incoming_price_update.forward_factor,
-                                    timestamp: incoming_price_update.timestamp,
-                                };
-                                graph.update_edge(
-                                    vertex_index[source_ind.unwrap()],
-                                    vertex_index[dest_ind.unwrap()],
-                                    new_edge.rate,
-                                );
-                                edge_data[e_curr.index()] = new_edge;
-                            } else {
-                                // do nothing.
-                            }
-                        }
-                    }
-
-                    // Check reverse direction.
-                    //                    let edge_i = graph.find_edge(dest_node.unwrap(), source_node.unwrap());
-                    let edge_i = source_node.and_then(|u| {
-                        dest_node.and_then(|v| graph.find_edge(node_index(v), node_index(u)))
-                    });
-                    match edge_i {
-                        None => {
-                            // If not, simply add new edge.
-                            let e = source_node.and_then(|u| {
-                                dest_node.map(|v| {
-                                    graph.update_edge(
-                                        node_index(v),
-                                        node_index(u),
-                                        edge_backward.rate,
-                                    )
-                                })
-                            });
-
-                            e.map(|e| edge_index.push(e));
-                            //                            edge_index.push(e);
-                            edge_data.push(edge_backward);
-                        }
-                        Some(_0) => {
-                            // if one exists, only update if the new rate is more recent.
-                            if datetime_helpers::is_more_recent(
-                                incoming_price_update.timestamp,
-                                edge_data[edge_i.unwrap().index()].timestamp,
-                            ) {
-                                let new_edge = Edge {
-                                    rate: incoming_price_update.backward_factor,
-                                    timestamp: incoming_price_update.timestamp,
-                                };
-                                graph.update_edge(
-                                    vertex_index[dest_ind.unwrap()],
-                                    vertex_index[source_ind.unwrap()],
-                                    new_edge.rate,
-                                );
-                                edge_data[edge_i.unwrap().index()] = new_edge;
-                            } else {
-                                // do nothing.
-                            }
-                        }
-                    }
-                } else {
-                }
-                /* Nothing new to add
-                 *  Proceed to build graph and get best path.
-                 */
-
-                if DEBUG {
-                    println!("EDGES: {}", graph.edge_count());
-                }
-
-                // Best rate lookup table initialisation. As detailed in the challenge brief.
-                if graph.node_count() > 0 {
-                    let rate = make_best_rate_table(&graph);
-                    let next = make_next_table(&graph);
-
-                    //==============MODIFIED FLOYD-WARSHALL======================
-                    let res = modified_floyd_warshall(&rate, &next, &graph);
-
-                    // Update rate and next tables.
-                    let rate = res.0;
-                    let next = res.1;
-
-                    // Turn debug on to see the lookup tables.
-                    if DEBUG {
-                        println!("========= UPDATED NEXTS ===========");
-                        for i in 0..next.rows {
-                            for j in 0..next.columns {
-                                print!("{} ", next.get((i, j)));
-                            }
-                            print!("\n");
-                        }
-                        println!("========= UPDATED RATES ===========");
-                        for i in 0..rate.rows {
-                            for j in 0..rate.columns {
-                                print!("{} ", rate.get((i, j)));
-                            }
-                            print!("\n");
-                        }
-                    }
-                    for (i, item) in graph.raw_nodes().iter().enumerate() {
-                        println!("At {} is item: {:?}", i, item);
-                    }
-                    for (i, item) in graph.raw_edges().iter().enumerate() {
-                        println!("At {} is item: {:?}", i, item);
-                    }
-
-                    if is_request {
-                        let rate_request =
-                            io_helpers::exchange_rate_request(input_string.split_whitespace());
-
-                        let best_rate = get_best_rates(rate_request.clone(), &rate, &graph);
-
-                        best_rate
-                            .map(|best_rate| print_results_part_one(&rate_request, &best_rate));
-
-                        let path = get_path_from_request(&rate_request, &next, &graph);
-                        print_results_part_two(&path, &graph);
-                        //                        path.map(|path| print_results_part_two(path, &graph));
-
-                        println!("BEST_RATES_END");
+                        None => println!("There was a problem adding edges between nodes."),
                     }
                 }
             }
@@ -475,77 +276,4 @@ pub fn print_results_part_two(path: &Option<Vec<usize>>, graph: &Graph<String, f
         }
         None => println!("There is no path from source to desired destination"),
     }
-}
-
-pub fn process_edges(
-    vertex: &Vertex,
-    edge_data: &Vec<Edge>,
-    incoming_price_update: &PriceUpdate,
-    graph: Graph<String, f32>,
-) -> (Graph<String, f32>, Vec<Edge>) {
-    let mut edge_data = edge_data.clone();
-    for (index, node) in graph.raw_nodes().iter().enumerate() {
-        if node.weight.contains(&vertex.currency) {
-            let dest_index = get_index_from_node(&vertex, &graph);
-
-            let edge_to_dest =
-                dest_index.and_then(|i| graph.find_edge(node_index(index), node_index(i)));
-
-            match edge_to_dest {
-                None => {
-                    let mut graph = graph.clone();
-                    dest_index.map(|dest_index| {
-                        graph.update_edge(
-                            node_index(index),
-                            node_index(dest_index),
-                            DEFAULT_EDGE_WEIGHT,
-                        )
-                    });
-                    edge_data.push(Edge {
-                        rate: DEFAULT_EDGE_WEIGHT,
-                        timestamp: incoming_price_update.timestamp,
-                    });
-                }
-                Some(e) => {
-                    if DEBUG {
-                        println!(
-                            "FOUND EDGE OF INDEX: {:?}, {:?}",
-                            e,
-                            edge_data[e.index()].timestamp
-                        );
-                    }
-                }
-            }
-
-            let edge_to_dest =
-                dest_index.and_then(|i| graph.find_edge(node_index(i), node_index(index)));
-
-            match edge_to_dest {
-                None => {
-                    let mut graph = graph.clone();
-                    dest_index.map(|dest_index| {
-                        graph.update_edge(
-                            node_index(index),
-                            node_index(dest_index),
-                            DEFAULT_EDGE_WEIGHT,
-                        )
-                    });
-                    edge_data.push(Edge {
-                        rate: DEFAULT_EDGE_WEIGHT,
-                        timestamp: incoming_price_update.timestamp,
-                    });
-                }
-                Some(e) => {
-                    if DEBUG {
-                        println!(
-                            "FOUND EDGE OF INDEX: {:?}, {:?}",
-                            e,
-                            edge_data[e.index()].timestamp
-                        );
-                    }
-                }
-            }
-        }
-    }
-    return (graph, edge_data);
 }

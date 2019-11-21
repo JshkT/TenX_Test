@@ -3,14 +3,11 @@
 * (The Exchange Rate Path Problem)
 */
 
-use crate::{ExchangeRateRequest, Vertex, DEBUG};
-use matrix::format::compressed::Variant;
-use matrix::prelude::Compressed;
-use matrix::Matrix;
+use crate::datetime_helpers::is_more_recent;
+use crate::{Edge, PriceUpdate, Vertex, DEBUG, DEFAULT_EDGE_WEIGHT};
+use chrono::{DateTime, FixedOffset};
 use petgraph::graph::node_index;
 use petgraph::Graph;
-use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
-use rust_decimal::Decimal;
 
 pub fn get_index_from_node(v: &Vertex, graph: &Graph<String, f32>) -> Option<usize> {
     for (i, item) in graph.raw_nodes().iter().enumerate() {
@@ -19,64 +16,6 @@ pub fn get_index_from_node(v: &Vertex, graph: &Graph<String, f32>) -> Option<usi
         }
     }
     return None;
-}
-
-//pub fn get_index_from_vertex(
-//    v: &Vertex,
-//    vertex_data: &Vec<Vertex>,
-//    vertex_index: &Vec<NodeIndex>,
-//) -> Option<NodeIndex> {
-//    let ind = vertex_data.iter().position(|x| x.eq(v));
-//    //    return vertex_index[ind]?;
-//    match ind {
-//        None => {
-//            //            println!("Get index from vertex not found.");
-//            return None;
-//        }
-//        Some(i) => {
-//            //            println!("Get index found: {}", ind.unwrap());
-//            return Some(vertex_index[i]);
-//            //            return ind.and_then(|ind| Option::from(vertex_index[ind]));
-//        }
-//    }
-//}
-
-pub fn get_path_from_request(
-    rate_request: &ExchangeRateRequest,
-    next: &Compressed<usize>,
-    graph: &Graph<String, f32>,
-) -> Option<Vec<usize>> {
-    let rate_request = rate_request.clone();
-    let source_vertex = Vertex {
-        exchange: rate_request.source_exchange,
-        currency: rate_request.source_currency,
-    };
-    let dest_vertex = Vertex {
-        exchange: rate_request.destination_exchange,
-        currency: rate_request.destination_currency,
-    };
-
-    let u = get_index_from_node(&source_vertex, &graph);
-    let v = get_index_from_node(&dest_vertex, &graph);
-
-    let path = u.and_then(|u| v.and_then(|v| get_path_from_index(u, v, next)));
-    return path;
-}
-
-pub fn get_path_from_index(u: usize, v: usize, next: &Compressed<usize>) -> Option<Vec<usize>> {
-    //    println!("get_path received {} and {}", u, v);
-    let mut path: Vec<usize> = Vec::new();
-    path.push(u);
-    //    println!("{:?}", path.get(u));
-    let mut u = u;
-    while u != v {
-        //        println!("{}, {}", u, v);
-        u = next.get((u, v));
-        path.push(u);
-    }
-    //    println!("{}, {}", u, v);
-    //    println!("LEN: {}", path.len());
-    return Some(path);
 }
 
 /*
@@ -91,122 +30,6 @@ pub fn vertex_string_format(v: &Vertex) -> String {
     return node_str;
 }
 
-//==============MODIFIED FLOYD-WARSHALL======================
-pub fn modified_floyd_warshall(
-    rate: &Compressed<f32>,
-    next: &Compressed<usize>,
-    graph: &Graph<String, f32>,
-) -> (Compressed<f32>, Compressed<usize>) {
-    let mut rate_out = rate.clone();
-    let mut next_out = next.clone();
-
-    for k in 0..graph.node_count() {
-        for i in 0..graph.node_count() {
-            for j in 0..graph.node_count() {
-                let u = Decimal::from_f32(rate_out.get((i, j)));
-                let a = Decimal::from_f32(rate_out.get((i, k)));
-                let b = Decimal::from_f32(rate_out.get((k, j)));
-
-                let res = a.and_then(|a| b.and_then(|b| a.checked_mul(b)));
-
-                if let Some(true) = u.and_then(|u| res.map(|res| u < res)) {
-                    let x = res.and_then(|res| Decimal::to_f32(&res));
-
-                    // Set rate and next.
-                    x.map(|x| rate_out.set((i, j), x));
-                    next_out.set((i, j), next.get((i, k)));
-                };
-            }
-        }
-    }
-    return (rate_out, next_out);
-}
-
-pub fn get_best_rates(
-    rate_request: ExchangeRateRequest,
-    rate: &Compressed<f32>,
-    graph: &Graph<String, f32>,
-) -> Option<f32> {
-    let source_vertex = Vertex {
-        exchange: rate_request.source_exchange,
-        currency: rate_request.source_currency,
-    };
-    let dest_vertex = Vertex {
-        exchange: rate_request.destination_exchange,
-        currency: rate_request.destination_currency,
-    };
-
-    if graph_contains(&source_vertex, &graph) && graph_contains(&dest_vertex, &graph) {
-        //        let source_index = get_index_from_vertex(&source_vertex, &vertex_data, &vertex_index);
-        //        let dest_index = get_index_from_vertex(&dest_vertex, &vertex_data, &vertex_index);
-
-        let u = get_index_from_node(&source_vertex, &graph);
-        let v = get_index_from_node(&dest_vertex, &graph);
-
-        //        let u = source_index.map(|u1| u1.index());
-        //        let v = dest_index.map(|v1| v1.index());
-        let best_rate = u.and_then(|u| v.map(|v| rate.get((u, v))));
-        return best_rate;
-    } else {
-        println!("Either Source or Destination does not exist yet.");
-        return None;
-    }
-}
-
-// Creates initial state for the "next" lookup table as specified in the brief.
-pub fn make_next_table(graph: &Graph<String, f32>) -> Compressed<usize> {
-    let mut next: Compressed<usize> =
-        Compressed::new((graph.node_count(), graph.node_count()), Variant::Column);
-
-    for i in 0..graph.node_count() {
-        for j in 0..graph.node_count() {
-            next.set((i, j), j);
-        }
-    }
-
-    // Prints out the initial "next" lookup table
-    if DEBUG {
-        for i in 0..next.rows {
-            for j in 0..next.columns {
-                print!("{} ", next.get((i, j)));
-            }
-            print!("\n");
-        }
-    }
-
-    return next;
-}
-
-//Builds Rate lookup table.
-pub fn make_best_rate_table(graph: &Graph<String, f32>) -> Compressed<f32> {
-    let mut rate: Compressed<f32> = Compressed::zero((graph.node_count(), graph.node_count()));
-    for i in 0..graph.node_count() {
-        for j in 0..graph.node_count() {
-            let x = graph.find_edge(node_index(i), node_index(j));
-            match x {
-                None => {
-                    rate.set((i, j), 0.0);
-                }
-                Some(e) => {
-                    let y = graph.edge_weight(e);
-                    y.map(|y| rate.set((i, j), *y));
-                }
-            }
-        }
-    }
-
-    // Prints out the initial "rate" lookup table.
-    if DEBUG {
-        for i in 0..rate.rows {
-            for j in 0..rate.columns {
-                print!("{} ", rate.get((i, j)));
-            }
-            print!("\n");
-        }
-    }
-    return rate;
-}
-
 pub fn graph_contains(v: &Vertex, g: &Graph<String, f32>) -> bool {
     for item in g.raw_nodes() {
         if item.weight.eq(&vertex_string_format(v)) {
@@ -216,6 +39,171 @@ pub fn graph_contains(v: &Vertex, g: &Graph<String, f32>) -> bool {
     return false;
 }
 
-//pub fn add_vertex_to_graph(v: &Vertex, g: &Graph<String, f32>) -> Graph<String, f32> {
-//    let node_str = vertex_string_format(&vertex_source);
-//}
+pub fn process_edges_same_currency(
+    vertex: &Vertex,
+    edge_data: &Vec<Edge>,
+    incoming_price_update: &PriceUpdate,
+    graph: &Graph<String, f32>,
+) -> (Graph<String, f32>, Vec<Edge>) {
+    let mut edge_data = edge_data.clone();
+    let mut graph: Graph<String, f32> = graph.clone();
+
+    // new_edges exists because we can't update graph until we're finished iterating over it.
+    let mut new_edges: Vec<(usize, usize, f32, DateTime<FixedOffset>)> = Vec::new();
+
+    for (index, node) in graph.raw_nodes().iter().enumerate() {
+        if node.weight.contains(&vertex.currency) {
+            let dest_index = get_index_from_node(&vertex, &graph);
+
+            let edge_to_dest =
+                dest_index.and_then(|i| graph.find_edge(node_index(index), node_index(i)));
+
+            match edge_to_dest {
+                None => {
+                    dest_index.map(|dest_index| {
+                        new_edges.push((
+                            index,
+                            dest_index,
+                            DEFAULT_EDGE_WEIGHT,
+                            incoming_price_update.timestamp,
+                        ))
+                    });
+                    edge_data.push(Edge {
+                        source_index: index,
+                        dest_index: dest_index.unwrap(),
+                        rate: DEFAULT_EDGE_WEIGHT,
+                        timestamp: incoming_price_update.timestamp,
+                    });
+                }
+                Some(e) => {
+                    if DEBUG {
+                        println!(
+                            "FOUND EDGE OF INDEX: {:?}, {:?}",
+                            e,
+                            edge_data[e.index()].timestamp
+                        );
+                    }
+                }
+            }
+
+            let edge_to_dest =
+                dest_index.and_then(|i| graph.find_edge(node_index(i), node_index(index)));
+
+            match edge_to_dest {
+                None => {
+                    dest_index.map(|dest_index| {
+                        new_edges.push((
+                            dest_index,
+                            index,
+                            DEFAULT_EDGE_WEIGHT,
+                            incoming_price_update.timestamp,
+                        ))
+                    });
+
+                    edge_data.push(Edge {
+                        source_index: dest_index.unwrap(),
+                        dest_index: index,
+                        rate: DEFAULT_EDGE_WEIGHT,
+                        timestamp: incoming_price_update.timestamp,
+                    });
+                }
+                Some(e) => {
+                    if DEBUG {
+                        println!(
+                            "FOUND EDGE OF INDEX: {:?}, {:?}",
+                            e,
+                            edge_data[e.index()].timestamp
+                        );
+                    }
+                }
+            }
+        }
+    }
+    for e in &new_edges {
+        graph.update_edge(node_index(e.0), node_index(e.1), e.2);
+    }
+
+    return (graph, edge_data);
+}
+
+pub fn process_edges_between_two_nodes(
+    source_node_index: usize,
+    dest_node_index: usize,
+    incoming_price_update: &PriceUpdate,
+    edge_data: &Vec<Edge>,
+    graph: &Graph<String, f32>,
+) -> (Graph<String, f32>, Vec<Edge>) {
+    let mut graph = graph.clone();
+    let mut edge_data = edge_data.clone();
+
+    let edge_forward = Edge {
+        source_index: source_node_index,
+        dest_index: dest_node_index,
+        rate: incoming_price_update.forward_factor,
+        timestamp: incoming_price_update.timestamp,
+    };
+    let edge_backward = Edge {
+        source_index: source_node_index,
+        dest_index: dest_node_index,
+        rate: incoming_price_update.backward_factor,
+        timestamp: incoming_price_update.timestamp,
+    };
+
+    let edge_i = graph.find_edge(node_index(source_node_index), node_index(dest_node_index));
+    match edge_i {
+        None => {
+            graph.update_edge(
+                node_index(source_node_index),
+                node_index(dest_node_index),
+                incoming_price_update.forward_factor,
+            );
+            edge_data.push(edge_forward);
+        }
+        Some(e_curr) => {
+            // if one exists, only update if the new rate is more recent.
+            if is_more_recent(
+                incoming_price_update.timestamp,
+                edge_data[e_curr.index()].timestamp,
+            ) {
+                graph.update_edge(
+                    node_index(source_node_index),
+                    node_index(dest_node_index),
+                    edge_forward.rate,
+                );
+                edge_data[e_curr.index()] = edge_forward;
+            } else {
+                // Don't update if new update isn't more recent.
+            }
+        }
+    }
+
+    // Reverse destination and source to find backward edge.
+    let edge_i = graph.find_edge(node_index(dest_node_index), node_index(source_node_index));
+    match edge_i {
+        None => {
+            graph.update_edge(
+                node_index(dest_node_index),
+                node_index(source_node_index),
+                incoming_price_update.backward_factor,
+            );
+            edge_data.push(edge_backward);
+        }
+        Some(e_curr) => {
+            // if one exists, only update if the new rate is more recent.
+            if is_more_recent(
+                incoming_price_update.timestamp,
+                edge_data[e_curr.index()].timestamp,
+            ) {
+                graph.update_edge(
+                    node_index(dest_node_index),
+                    node_index(source_node_index),
+                    edge_backward.rate,
+                );
+                edge_data[e_curr.index()] = edge_backward;
+            } else {
+                // Don't update if new update isn't more recent.
+            }
+        }
+    }
+    return (graph, edge_data);
+}
