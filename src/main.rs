@@ -19,7 +19,6 @@ use crate::modified_floyd_warshall_helpers::{
 
 use chrono::{DateTime, FixedOffset};
 use petgraph::graph::node_index;
-use petgraph::prelude::NodeIndex;
 use petgraph::Graph;
 use std::io;
 use std::io::BufRead;
@@ -65,17 +64,12 @@ const DEFAULT_EDGE_WEIGHT: f32 = 1.0;
 const DEBUG: bool = false;
 
 fn main() {
-    println!("Please enter either a Price Update or an Exchange Rate Request: ");
-
     let stdin = io::stdin();
 
     let mut graph = Graph::<String, f32>::new();
+    let edge_data: Vec<Edge> = Vec::new();
 
-    let mut vertex_data: Vec<Vertex> = Vec::new();
-    let mut vertex_index: Vec<NodeIndex> = Vec::new();
-
-    let mut edge_data: Vec<Edge> = Vec::new();
-
+    println!("Please enter either a Price Update or an Exchange Rate Request: ");
     for line in stdin.lock().lines() {
         let input_string = match &line {
             Ok(s) => s,
@@ -111,6 +105,12 @@ fn main() {
 
                         // Turn debug on to see the lookup tables.
                         if DEBUG {
+                            for (i, item) in graph.raw_nodes().iter().enumerate() {
+                                println!("At {} is item: {:?}", i, item);
+                            }
+                            for (i, item) in graph.raw_edges().iter().enumerate() {
+                                println!("At {} is item: {:?}", i, item);
+                            }
                             println!("========= UPDATED NEXTS ===========");
                             for i in 0..next.rows {
                                 for j in 0..next.columns {
@@ -126,29 +126,22 @@ fn main() {
                                 print!("\n");
                             }
                         }
-                        for (i, item) in graph.raw_nodes().iter().enumerate() {
-                            println!("At {} is item: {:?}", i, item);
-                        }
-                        for (i, item) in graph.raw_edges().iter().enumerate() {
-                            println!("At {} is item: {:?}", i, item);
-                        }
 
-                        if is_request {
-                            let rate_request =
-                                io_helpers::exchange_rate_request(input_string.split_whitespace());
-                            println!("{:?}", rate);
+                        // ========== Process Request ==============
+                        let rate_request =
+                            io_helpers::exchange_rate_request(input_string.split_whitespace());
+                        //                        println!("{:?}", rate);
 
-                            let best_rate = get_best_rates(rate_request.clone(), &rate, &graph);
+                        let best_rate = get_best_rates(rate_request.clone(), &rate, &graph);
 
-                            best_rate
-                                .map(|best_rate| print_results_part_one(&rate_request, &best_rate));
+                        best_rate
+                            .map(|best_rate| print_results_part_one(&rate_request, &best_rate));
 
-                            let path = get_path_from_request(&rate_request, &next, &graph);
-                            print_results_part_two(&path, &graph);
-                            //                        path.map(|path| print_results_part_two(path, &graph));
+                        let path = get_path_from_request(&rate_request, &next, &graph);
+                        print_results_part_two(&path, &graph);
+                        //                        path.map(|path| print_results_part_two(path, &graph));
 
-                            println!("BEST_RATES_END");
-                        }
+                        println!("BEST_RATES_END");
                     }
                 } else {
                     // Input was found to be a Price Update not a Exchange Rate Request.
@@ -166,25 +159,11 @@ fn main() {
                     };
 
                     // Check if source vertex exists in our data and only add if it does not.
-                    if let false = vertex_data.contains(&vertex_source) {
-                        let node_str = vertex_string_format(&vertex_source);
-                        let v_source_index = graph.add_node(node_str);
-                        vertex_data.push(vertex_source.clone());
-                        vertex_index.push(v_source_index);
-                    }
-                    // Similarly for the destination vertex.
-                    if let false = vertex_data.contains(&vertex_destination) {
-                        let node_str = vertex_string_format(&vertex_destination);
-                        let v_destination_index = graph.add_node(node_str);
-                        vertex_data.push(vertex_destination.clone());
-                        vertex_index.push(v_destination_index);
-                    }
-
                     if let false = graph_contains(&vertex_source, &graph) {
                         let node_str = vertex_string_format(&vertex_source);
                         graph.add_node(node_str);
                     }
-
+                    // Similarly for the destination vertex.
                     if let false = graph_contains(&vertex_destination, &graph) {
                         let node_str = vertex_string_format(&vertex_destination);
                         graph.add_node(node_str);
@@ -208,7 +187,7 @@ fn main() {
 
                     // Update graph and edge_data with our results.
                     graph = res.0;
-                    edge_data = res.1;
+                    let edge_data = res.1;
 
                     /* Do the same for vertex_source's currency.
                      */
@@ -221,7 +200,7 @@ fn main() {
 
                     // Update graph and edge_data with our results.
                     graph = res.0;
-                    edge_data = res.1;
+                    let edge_data = res.1;
 
                     /* The following adds edges as specified in the incoming price update.
                      * It only adds edges if they are either found not to exist or if the
@@ -245,7 +224,11 @@ fn main() {
                     match res {
                         Some(r) => {
                             graph = r.0;
-                            edge_data = r.1;
+                            /*  Don't need to update edge_data here because
+                             *  there is nothing left to pass that information to.
+                             *  We will have to rebuild it when the next update comes in.
+                             *  If a request comes in, it isn't used so no need to preserve it.
+                             */
                         }
                         None => println!("There was a problem adding edges between nodes."),
                     }

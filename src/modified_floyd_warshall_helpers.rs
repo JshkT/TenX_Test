@@ -29,7 +29,7 @@ pub fn modified_floyd_warshall(
                 let u = Decimal::from_f32(rate_out.get((i, j)));
                 let a = Decimal::from_f32(rate_out.get((i, k)));
                 let b = Decimal::from_f32(rate_out.get((k, j)));
-                println!("u: {:?}, a: {:?}, b:  {:?}", u, a, b);
+                //                println!("u: {:?}, a: {:?}, b:  {:?}", u, a, b);
 
                 let res = a.and_then(|a| b.and_then(|b| a.checked_mul(b)));
 
@@ -111,7 +111,6 @@ pub fn make_best_rate_table(graph: &Graph<String, f32>) -> Compressed<f32> {
             print!("\n");
         }
     }
-    println!("{:?}", rate);
     return rate;
 }
 
@@ -154,14 +153,9 @@ pub fn get_best_rates(
     };
 
     if graph_contains(&source_vertex, &graph) && graph_contains(&dest_vertex, &graph) {
-        //        let source_index = get_index_from_vertex(&source_vertex, &vertex_data, &vertex_index);
-        //        let dest_index = get_index_from_vertex(&dest_vertex, &vertex_data, &vertex_index);
-
         let u = get_index_from_node(&source_vertex, &graph);
         let v = get_index_from_node(&dest_vertex, &graph);
 
-        //        let u = source_index.map(|u1| u1.index());
-        //        let v = dest_index.map(|v1| v1.index());
         let best_rate = u.and_then(|u| v.map(|v| rate.get((u, v))));
         return best_rate;
     } else {
