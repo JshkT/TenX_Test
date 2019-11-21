@@ -18,7 +18,7 @@ https://doc.rust-lang.org/1.30.0/book/second-edition/ch01-01-installation.html
 
 After that, enter the following commands in Terminal to run the program.
 ```sh
-$ cd TenX_Test
+$ cd TenX_Test-1.1
 $ cargo build
 $ cargo run
 ```
